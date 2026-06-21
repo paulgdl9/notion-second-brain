@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Chemin absolu : ~/.local/bin n'est PAS dans le PATH d'un SSH/HTTP non-interactif
-CLAUDE_BIN="/home/debian/.local/bin/claude"
+# ~/.local/bin n'est PAS dans le PATH d'un SSH/HTTP non-interactif : on prend
+# CLAUDE_BIN de l'environnement (fourni par le bridge / .env), sinon le PATH.
+CLAUDE_BIN="${CLAUDE_BIN:-$(command -v claude || echo claude)}"
 
 input="$(cat)"
 areas="${MEMO_AREAS:-Work,Projects,Finance,Health,Learning,Personal,Knowledge}"

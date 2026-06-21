@@ -63,5 +63,20 @@ class SummarizeFallbackTests(unittest.TestCase):
         self.assertEqual(engine, "none")
 
 
+class RunClaudeTests(unittest.TestCase):
+    """Regression guard: run_claude must parse the summarizer's JSON output.
+    A missing return once made it always yield None, silently disabling Claude."""
+
+    def test_parses_json_from_summarizer_stdout(self):
+        completed = mock.Mock(returncode=0, stdout='noise {"title": "ok"} trailing')
+        with mock.patch.object(memo_bridge.subprocess, "run", return_value=completed):
+            self.assertEqual(memo_bridge.run_claude("contenu"), {"title": "ok"})
+
+    def test_returns_none_on_nonzero_exit(self):
+        failed = mock.Mock(returncode=1, stdout='{"title": "ignored"}')
+        with mock.patch.object(memo_bridge.subprocess, "run", return_value=failed):
+            self.assertIsNone(memo_bridge.run_claude("contenu"))
+
+
 if __name__ == "__main__":
     unittest.main()

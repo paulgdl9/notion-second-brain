@@ -1,21 +1,38 @@
-# n8n Raspberry Pi setup
+# n8n + memo-bridge second brain
 
-This repository tracks the n8n runtime configuration and workflow exports for `/SSD/n8n`.
+A self-hosted objective-driven "second brain": an n8n stack plus a small Python bridge that
+turns captures and an objectives database into a daily brief, all stored in Notion. It runs on
+any Linux host with Docker (originally a Raspberry Pi).
 
 Full operational documentation lives in [`docs/repo-overview.md`](docs/repo-overview.md).
+The exact Notion databases and pages to create are described in
+[`docs/notion-setup.md`](docs/notion-setup.md).
 
-Secrets are centralized on the Raspberry Pi in:
+## Quick start
 
 ```bash
-/SSD/n8n/.env
+git clone <this-repo> second-brain && cd second-brain
+./install.sh                      # 1st run: creates .env, then asks you to fill it
+$EDITOR .env                      # secrets, Notion IDs, Telegram, RSS feeds
+./install.sh                      # 2nd run: units + docker + workflow import
 ```
 
-Do not commit the real file. Use `.env.example` as the template.
+`install.sh` is idempotent. It checks prerequisites (Docker, `docker compose`, Python 3, `jq`,
+and the `claude`/`codex` CLIs), creates `.env` from `.env.example`, renders the systemd units
+from the `systemd/*.in` templates for the current user and path, starts the Docker stack, and
+imports the workflows once `N8N_NOTION_CREDENTIAL_ID` is set.
+
+Prerequisites you install yourself: Docker Engine + compose plugin, Python 3, `jq`, a Cloudflare
+tunnel token, a Notion integration, and the `claude` (and optionally `codex`) CLI on `PATH`.
+
+Secrets live only in `.env` (never committed). Use `.env.example` as the template.
 
 ## Services
 
-- `docker-compose.yml` runs `n8n` and `cloudflared`.
-- `systemd/memo-bridge.service` runs the local Python bridge.
+- `docker-compose.yml` runs `n8n` and `cloudflared`. The n8n container reaches the host bridge
+  via `host.docker.internal` (mapped through `extra_hosts`), so no gateway IP is hard-coded.
+- `systemd/*.service.in` are templates rendered by `install.sh` for the current user/path
+  (bridge + watchdog). Edit the templates, not the installed units under `/etc/systemd/system`.
 - `bridge/memo-bridge.py` exposes `/summarize` (Haiku → Codex) and `/brief` (Sonnet → Codex) for n8n.
 - `bridge/memo-summarize` is the Claude CLI wrapper used by `/summarize`.
 - `bridge/memo.sh` sends quick captures to the public n8n webhook.
@@ -48,18 +65,23 @@ Notion resources used by the **n8n RPi** integration: Daily Brief, Notes, `Conte
 as employment, income, priorities, project progress, and copilot rules. Its ID is configured through
 `NOTION_CONTEXT_PAGE_ID` in `.env` rather than embedded in the workflow export.
 
-The host watchdog checks n8n health, cloudflared, memo-bridge, and the Daily Brief heartbeat every
-five minutes. n8n's global error workflow reports workflow and Notion failures independently.
+The host watchdog checks n8n health, cloudflared, memo-bridge, the Daily Brief heartbeat, and a
+**public-URL canary** (an HTTP probe of `N8N_PUBLIC_URL/healthz` through Cloudflare, to catch a
+tunnel that is up as a container but no longer routing) every five minutes. n8n's global error
+workflow reports workflow and Notion failures independently.
+
+Continuous integration ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) compiles the
+Python sources, runs the bridge tests, validates every workflow JSON, and lints the shell scripts.
 
 Docker images are pinned by version and digest. Healthchecks, process limits, and bounded JSON logs
 are defined in `docker-compose.yml`; CPU and memory remain available dynamically.
 
 ## Rotate secrets
 
-Edit `/SSD/n8n/.env`, then reload both consumers:
+Edit `<repo>/.env`, then reload both consumers:
 
 ```bash
-cd /SSD/n8n
+cd <repo>
 docker compose up -d n8n
 sudo systemctl restart memo-bridge.service
 ```

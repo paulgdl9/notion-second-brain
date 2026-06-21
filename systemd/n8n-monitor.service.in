@@ -5,13 +5,12 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=debian
-Group=debian
-Environment=N8N_ROOT=/SSD/n8n
-ExecStart=/usr/bin/python3 /SSD/n8n/scripts/monitor-system.py
+User=@USER@
+Group=@GROUP@
+Environment=N8N_ROOT=@REPO@
+ExecStart=@PYTHON@ @REPO@/scripts/monitor-system.py
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/SSD/n8n/runtime
-
+ReadWritePaths=@REPO@/runtime

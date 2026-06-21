@@ -1,5 +1,8 @@
 # memo — capture rapide vers Inbox IA (webhook n8n)
-export N8N_SECRETS_FILE="${N8N_SECRETS_FILE:-/SSD/n8n/.env}"
+# Localise ce fichier (sourcé depuis bash ou zsh) ; le .env du repo est un cran au-dessus.
+_memo_self="${BASH_SOURCE[0]:-${(%):-%N}}"
+_memo_dir="$(cd "$(dirname "$_memo_self")" 2>/dev/null && pwd)"
+export N8N_SECRETS_FILE="${N8N_SECRETS_FILE:-${_memo_dir%/bridge}/.env}"
 
 _memo_env_value() {
   local key="$1"

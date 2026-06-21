@@ -6,20 +6,23 @@ n8n POST /summarize {source,url,text} -> objet enrichi prêt pour Notion.
   car claude -p n'a pas d'accès web.
 - Déduit la source (Twitter / Article) si non fournie.
 - Crée TOUJOURS une capture (fallback) plutôt que d'échouer en 502."""
-import json, os, re, subprocess, hmac, tempfile, urllib.request
+import json, os, re, shutil, subprocess, hmac, tempfile, urllib.request
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 TOKEN = os.environ.get("MEMO_TOKEN", "")
 PORT = int(os.environ.get("MEMO_PORT", "8088"))
-SUMMARIZER = "/SSD/n8n/bridge/memo-summarize"
-CLAUDE_BIN = "/home/debian/.local/bin/claude"
-CODEX_BIN = "/home/debian/.local/bin/codex"
+# Chemins resolus depuis l'environnement, sinon decouverte sur le PATH, sinon nom nu.
+# Aucune valeur specifique a une machine n'est codee en dur (portabilite / open source).
+SUMMARIZER = os.environ.get("MEMO_SUMMARIZER") or str(Path(__file__).resolve().parent / "memo-summarize")
+CLAUDE_BIN = os.environ.get("CLAUDE_BIN") or shutil.which("claude") or "claude"
+CODEX_BIN = os.environ.get("CODEX_BIN") or shutil.which("codex") or "codex"
 BRIEF_MODEL = os.environ.get("BRIEF_MODEL", "claude-sonnet-4-6")
 AREAS = tuple(a.strip() for a in os.environ.get(
     "MEMO_AREAS", "Work,Projects,Finance,Health,Learning,Personal,Knowledge"
 ).split(",") if a.strip())
-MONITOR_STATE_DIR = os.environ.get("MONITOR_STATE_DIR", "/SSD/n8n/runtime")
+MONITOR_STATE_DIR = os.environ.get("MONITOR_STATE_DIR") or str(Path(__file__).resolve().parent.parent / "runtime")
 JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 URL_RE = re.compile(r"https?://[^\s]+")
 TWEET_RE = re.compile(r"https?://(?:www\.|mobile\.)?(?:x\.com|twitter\.com)/", re.I)
@@ -146,6 +149,15 @@ def run_claude(text):
         proc = subprocess.run([SUMMARIZER], input=text, capture_output=True, text=True, timeout=150)
     except Exception:
         return None
+    if proc.returncode != 0:
+        return None
+    m = JSON_RE.search(proc.stdout)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(0))
+    except Exception:
+        return None
 
 
 def run_codex_json(text):
@@ -180,15 +192,6 @@ def run_summarize_engine(text):
     if parsed:
         return parsed, "codex"
     return None, "none"
-    if proc.returncode != 0:
-        return None
-    m = JSON_RE.search(proc.stdout)
-    if not m:
-        return None
-    try:
-        return json.loads(m.group(0))
-    except Exception:
-        return None
 
 
 def infer_area(text):

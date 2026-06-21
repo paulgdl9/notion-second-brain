@@ -10,9 +10,9 @@ from datetime import datetime
 from pathlib import Path
 
 
-ROOT = Path(os.environ.get("N8N_ROOT", "/SSD/n8n"))
+ROOT = Path(os.environ.get("N8N_ROOT") or Path(__file__).resolve().parent.parent)
 ENV_FILE = ROOT / ".env"
-STATE_DIR = Path(os.environ.get("MONITOR_STATE_DIR", str(ROOT / "runtime")))
+STATE_DIR = Path(os.environ.get("MONITOR_STATE_DIR") or str(ROOT / "runtime"))
 STATE_FILE = STATE_DIR / "monitor-state.json"
 BRIEF_HEARTBEAT = STATE_DIR / "brief-heartbeat.json"
 
@@ -54,6 +54,22 @@ def bridge_ok(port):
         return False
 
 
+def public_ok(url):
+    """Canary: hit the public URL through Cloudflare to catch a tunnel that is up
+    as a container but no longer routing. Not configured -> never alarm.
+    A normal User-Agent is required: Cloudflare returns 403 to the default
+    urllib agent, which would otherwise look like an outage."""
+    if not url:
+        return True
+    target = url.rstrip("/") + "/healthz"
+    request = urllib.request.Request(target, headers={"User-Agent": "n8n-watchdog/1.0"})
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            return response.status == 200
+    except Exception:
+        return False
+
+
 def brief_ok(expected_by):
     now = datetime.now()
     hour, minute = (int(x) for x in expected_by.split(":", 1))
@@ -89,6 +105,7 @@ def main():
         "n8n": container_ok("n8n", require_health=True),
         "cloudflared": container_ok("cloudflared"),
         "memo-bridge": bridge_ok(env.get("MEMO_PORT", "8088")),
+        "public-tunnel": public_ok(env.get("N8N_PUBLIC_URL", "")),
         "daily-brief": brief_ok(env.get("BRIEF_EXPECTED_BY", "08:15")),
     }
     STATE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)

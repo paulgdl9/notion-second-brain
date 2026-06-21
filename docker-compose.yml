@@ -15,6 +15,10 @@ services:
       - N8N_EDITOR_BASE_URL=${N8N_PUBLIC_URL:?set N8N_PUBLIC_URL in .env}
       - N8N_PROXY_HOPS=1
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+    extra_hosts:
+      # Lets the container reach the host-side memo-bridge via host.docker.internal
+      # (works on Linux with Docker 20.10+, no hard-coded gateway IP needed).
+      - "host.docker.internal:host-gateway"
     volumes:
       - n8n_data:/home/node/.n8n
     healthcheck:

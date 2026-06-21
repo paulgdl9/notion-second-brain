@@ -1,6 +1,6 @@
 # Depot n8n Raspberry Pi
 
-Ce depot documente et versionne la configuration n8n hebergee sur le Raspberry Pi dans `/SSD/n8n`.
+Ce depot documente et versionne la configuration n8n hebergee sur le Raspberry Pi dans `<repo>`.
 
 Il sert a garder sous Git tout ce qui decrit le systeme, tout en laissant les secrets et l'etat runtime uniquement sur la machine.
 
@@ -80,34 +80,39 @@ retombe en bas (fallback sans `after`) : ne pas supprimer ce 1er bloc.
 
 ## Fichiers importants
 
-- `docker-compose.yml` : lance `n8n` et `cloudflared`.
+- `install.sh` : installeur idempotent (préflight, `.env`, unités systemd, docker, workflows).
+- `docker-compose.yml` : lance `n8n` et `cloudflared` ; `extra_hosts` mappe `host.docker.internal`.
 - `.env.example` : modele des variables attendues. Ce fichier est safe a commit.
-- `/SSD/n8n/.env` : fichier reel de secrets sur le Raspberry Pi. Il ne doit jamais etre commit.
+- `<repo>/.env` : fichier reel de secrets. Il ne doit jamais etre commit.
 - `bridge/memo-bridge.py` : serveur HTTP local utilise par n8n ; `/summarize` et `/brief` essaient
   Claude puis Codex avant leur fallback local.
 - `bridge/memo-summarize` : wrapper CLI Claude pour `/summarize`.
 - `bridge/memo.sh` : helper shell pour capturer rapidement du texte vers n8n.
-- `systemd/memo-bridge.service` : unite systemd durcie pour lancer le bridge.
-- `systemd/n8n-monitor.{service,timer}` : watchdog hôte indépendant de n8n.
-- `scripts/monitor-system.py` : vérifie services et heartbeat, avec alertes dédupliquées.
-- `scripts/rotate-secrets.sh` : script utilitaire pour recharger les services apres rotation.
+- `systemd/*.service.in` : templates d'unités (bridge + watchdog) rendus par `install.sh`.
+- `systemd/n8n-monitor.timer` : déclenche le watchdog toutes les cinq minutes.
+- `scripts/monitor-system.py` : vérifie services, canari public et heartbeat, alertes dédupliquées.
+- `scripts/{import,export}-workflows.sh` : import (pré-validé + backup) / export (atomique) sanitisés.
+- `scripts/rotate-secrets.sh` : recharge les services apres rotation des secrets.
+- `docs/notion-setup.md` : schéma exact des bases/pages Notion à créer.
+- `.github/workflows/ci.yml` : CI (compile, tests, validation JSON, lint shell).
+- `LICENSE` : MIT.
 - `workflows/` : exports JSON des workflows n8n.
-- `backups/` : backups locaux du Raspberry Pi, ignores par Git.
+- `backups/` : backups locaux, ignores par Git.
 
 ## Source unique des secrets
 
 Le fichier source de verite est :
 
 ```bash
-/SSD/n8n/.env
+<repo>/.env
 ```
 
 Ce fichier est lu directement par :
 
 - Docker Compose, via `env_file: ./.env`, pour injecter les variables dans le conteneur n8n.
 - Docker Compose lui-meme, pour interpoler `${CLOUDFLARED_TOKEN}` dans la commande cloudflared.
-- `memo-bridge.service`, via `EnvironmentFile=/SSD/n8n/.env`.
-- `bridge/memo.sh`, qui lit `CAPTURE_TOKEN` et `N8N_CAPTURE_URL` dans `/SSD/n8n/.env`.
+- `memo-bridge.service`, via `EnvironmentFile=<repo>/.env`.
+- `bridge/memo.sh`, qui lit `CAPTURE_TOKEN` et `N8N_CAPTURE_URL` dans `<repo>/.env`.
 - `scripts/monitor-system.py`, qui lit la configuration Telegram et les seuils de supervision.
 
 Il ne doit pas y avoir de copie active des tokens ailleurs. Les anciens chemins `secrets/common.env`, `bridge/memo-bridge.env` et `bridge/webhook-token.txt` ne sont plus utilises.
@@ -173,10 +178,10 @@ Impact si ce token est faux ou absent : n8n peut encore tourner localement, mais
 
 ## Rotation des secrets
 
-Editer `/SSD/n8n/.env`, puis recharger les consommateurs :
+Editer `<repo>/.env`, puis recharger les consommateurs :
 
 ```bash
-cd /SSD/n8n
+cd <repo>
 docker compose up -d n8n
 sudo systemctl restart memo-bridge.service
 ```
@@ -202,7 +207,7 @@ Il doit repondre `401`.
 Tester le bridge local :
 
 ```bash
-cd /SSD/n8n
+cd <repo>
 . ./.env
 curl -sS -X POST http://127.0.0.1:${MEMO_PORT}/summarize \
   -H 'Content-Type: application/json' \
@@ -222,7 +227,7 @@ git grep --cached -n -E '(Bearer [0-9a-f]{20,}|MEMO_TOKEN=[0-9a-f]|CAPTURE_TOKEN
 
 Ne jamais commit :
 
-- `/SSD/n8n/.env`
+- `<repo>/.env`
 - `backups/`
 - anciens exports de workflows contenant des tokens en clair
 - fichiers temporaires generes par Python ou Docker
@@ -254,22 +259,26 @@ publish_workflow(workflowId)   # MCP n8n
 Symptome typique si on oublie : le workflow "s'arrete au debut" / ne reflete pas les derniers
 changements alors que l'editeur montre le nouveau graphe.
 
+## Installation (nouveau déploiement)
+
+`./install.sh` à la racine fait tout, de façon idempotente : préflight (docker, compose, python3,
+jq, CLI claude/codex), création de `.env` depuis `.env.example`, rendu des unités systemd depuis
+les templates `systemd/*.in` pour l'utilisateur et le chemin courants, démarrage du stack Docker,
+puis import des workflows une fois `N8N_NOTION_CREDENTIAL_ID` renseigné. Voir `README.md` (Quick
+start) et `docs/notion-setup.md` pour le schéma Notion à créer.
+
+Les unités systemd sont des **templates** (`systemd/memo-bridge.service.in`,
+`systemd/n8n-monitor.service.in`) avec les placeholders `@USER@`, `@GROUP@`, `@HOME@`, `@REPO@`,
+`@PYTHON@`. Ne pas éditer les unités installées sous `/etc/systemd/system` : éditer les `.in` puis
+relancer `install.sh`. Aucun chemin spécifique à une machine n'est codé en dur (le bridge résout
+`SUMMARIZER`/`CLAUDE_BIN`/`CODEX_BIN`/`MONITOR_STATE_DIR` via l'environnement puis le PATH).
+
 ## Redemarrage complet
 
 ```bash
-cd /SSD/n8n
+cd <repo>
 docker compose up -d
 sudo systemctl restart memo-bridge.service
-```
-
-Installation du bridge et du watchdog :
-
-```bash
-sudo install -d -o debian -g debian -m 700 /SSD/n8n/runtime
-sudo install -m 644 systemd/memo-bridge.service /etc/systemd/system/
-sudo install -m 644 systemd/n8n-monitor.service systemd/n8n-monitor.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now memo-bridge.service n8n-monitor.timer
 ```
 
 ## Partage des pages Notion avec l'integration n8n
@@ -387,7 +396,11 @@ Structure du brief produit (~400 mots max) :
   une erreur observable au lieu de produire silencieusement un résultat vide.
 - Après une capture et après l'écriture du Daily Brief, n8n appelle les routes heartbeat du bridge.
 - Le timer systemd `n8n-monitor.timer` vérifie toutes les cinq minutes n8n (healthcheck),
-  cloudflared, memo-bridge et la présence du heartbeat quotidien après `BRIEF_EXPECTED_BY`.
+  cloudflared, memo-bridge, un **canari public** (`N8N_PUBLIC_URL/healthz` via Cloudflare, pour
+  détecter un tunnel qui ne route plus) et la présence du heartbeat quotidien après
+  `BRIEF_EXPECTED_BY`.
+- ⚠️ Le canari envoie un User-Agent normal : Cloudflare répond 403 à l'agent `urllib` par défaut,
+  ce qui ferait croire à tort à une panne.
 - Les alertes du watchdog sont envoyées lors d'une transition vers l'échec et lors du rétablissement,
   afin d'éviter une notification identique toutes les cinq minutes.
 

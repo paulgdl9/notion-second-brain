@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile Python sources
+        run: python -m py_compile bridge/memo-bridge.py scripts/monitor-system.py
+
+      - name: Run bridge tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Validate workflow JSON
+        run: |
+          for f in workflows/*.json; do
+            python -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
+            echo "ok: $f"
+          done
+
+      - name: Lint shell scripts
+        run: bash -n install.sh scripts/*.sh
