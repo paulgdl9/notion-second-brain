@@ -1,0 +1,29 @@
+[Unit]
+Description=Memo bridge (n8n -> claude summarizer)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=debian
+Group=debian
+Environment=HOME=/home/debian
+EnvironmentFile=/SSD/n8n/.env
+WorkingDirectory=/SSD/n8n/bridge
+ExecStart=/usr/bin/python3 /SSD/n8n/bridge/memo-bridge.py
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+UMask=0077
+ReadWritePaths=/SSD/n8n/runtime
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+# Runtime secrets and local state
+.env
+*.env
+bridge/memo-bridge.env
+bridge/webhook-token.txt
+
+# Backups and generated runtime data
+backups/
+runtime/
+secrets/
+*.backup
+*.bak
+__pycache__/
+*.pyc
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/

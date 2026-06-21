@@ -1,0 +1,38 @@
+[
+  {
+    "id": "globalErrorMonitor",
+    "name": "Monitoring — erreurs globales",
+    "active": true,
+    "nodes": [
+      {
+        "id": "2d5647dd-63a0-4c19-98b8-497579b5d101",
+        "name": "Erreur workflow",
+        "type": "n8n-nodes-base.errorTrigger",
+        "typeVersion": 1,
+        "position": [320, 240],
+        "parameters": {}
+      },
+      {
+        "id": "7eb7e7c5-9885-4d55-9830-01a768f5d102",
+        "name": "Alerte Telegram",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [560, 240],
+        "parameters": {
+          "method": "POST",
+          "url": "={{ 'https://api.telegram.org/bot' + $env.TELEGRAM_BOT_TOKEN + '/sendMessage' }}",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: 'ERREUR n8n\\n\\nWorkflow : ' + ($json.workflow?.name || 'inconnu') + '\\nNoeud : ' + ($json.execution?.lastNodeExecuted || 'inconnu') + '\\nMessage : ' + ($json.execution?.error?.message || 'erreur inconnue') + '\\nExecution : ' + ($json.execution?.url || $json.execution?.id || 'indisponible') }) }}",
+          "options": { "timeout": 15000 }
+        }
+      }
+    ],
+    "connections": {
+      "Erreur workflow": { "main": [[{ "node": "Alerte Telegram", "type": "main", "index": 0 }]] }
+    },
+    "settings": { "executionOrder": "v1", "availableInMCP": false },
+    "pinData": {},
+    "tags": []
+  }
+]

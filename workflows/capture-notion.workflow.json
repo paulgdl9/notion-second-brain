@@ -1,0 +1,313 @@
+[
+  {
+    "updatedAt": "2026-06-20T13:41:31.784Z",
+    "createdAt": "2026-06-19T22:30:04.811Z",
+    "id": "DbqnFl5IAG014bRK",
+    "name": "Capture → Notion (Inbox IA)",
+    "description": "Capture authentifiée vers Notion Inbox IA, avec résumé, insight, action proposée et domaine. Le bridge conserve un fallback si Claude est indisponible.",
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "capture",
+          "authentication": "none",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "df7f049f-4eca-4d3d-8e52-6068ab5310f0",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          144,
+          144
+        ],
+        "webhookId": "capture-inbox-ia",
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "nG5buhozHrlQyvfV",
+            "name": "Header Auth account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "POST",
+        "url": "={{ $env.MEMO_BRIDGE_URL + '/summarize' }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "={{ 'Bearer ' + $env.MEMO_TOKEN }}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json.body) }}",
+          "options": {
+            "timeout": 160000
+          }
+        },
+        "id": "f90f0751-514d-47ea-a0f4-70e46f83903e",
+        "name": "Memo Bridge",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          608,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "resource": "databasePage",
+          "databaseId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_INBOX_DATABASE_ID }}",
+            "mode": "id",
+            "cachedResultName": "Inbox IA"
+          },
+          "title": "={{ $json.title }}",
+          "propertiesUi": {
+            "propertyValues": [
+              {
+                "key": "Source|select",
+                "selectValue": "={{ $json.source }}"
+              },
+              {
+                "key": "URL|url",
+                "urlValue": "={{ $json.url }}"
+              },
+              {
+                "key": "Summary|rich_text",
+                "textContent": "={{ $json.summary }}"
+              },
+              {
+                "key": "Insight|rich_text",
+                "textContent": "={{ $json.insight }}"
+              },
+              {
+                "key": "Next Action|rich_text",
+                "textContent": "={{ $json.next_action }}"
+              },
+              {
+                "key": "Area|select",
+                "selectValue": "={{ $json.area }}"
+              },
+              {
+                "key": "Tags|multi_select",
+                "multiSelectValue": "={{ $json.tags }}"
+              },
+              {
+                "key": "Importance|number",
+                "numberValue": "={{ $json.importance }}"
+              },
+              {
+                "key": "Raw Content|rich_text",
+                "textContent": "={{ $json.text }}"
+              },
+              {
+                "key": "Captured At|date",
+                "date": "={{ $json.captured_at }}"
+              },
+              {
+                "key": "Status|select",
+                "selectValue": "Inbox"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "4ca8a125-0b3b-431c-8967-b02fbcac7a62",
+        "name": "Notion: créer page",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          832,
+          96
+        ],
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ ok: true, title: $('Memo Bridge').item.json.title, summary: $('Memo Bridge').item.json.summary, area: $('Memo Bridge').item.json.area, insight: $('Memo Bridge').item.json.insight, next_action: $('Memo Bridge').item.json.next_action }) }}",
+          "options": {}
+        },
+        "id": "fd94eba8-f69a-4ad9-bba3-debc3126b863",
+        "name": "Respond to Webhook",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          1056,
+          96
+        ]
+      },
+      {
+        "id": "2deeba7d-4fca-4eb3-b510-b64928450807",
+        "name": "Capture token valide",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          384,
+          144
+        ],
+        "parameters": {
+          "conditions": {
+            "combinator": "and",
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.headers['x-capture-token'] || '' }}",
+                "rightValue": "={{ $env.CAPTURE_TOKEN }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ]
+          },
+          "options": {
+            "ignoreCase": false,
+            "looseTypeValidation": false
+          }
+        }
+      },
+      {
+        "id": "37f2db2a-c102-415f-984b-d30bf9762818",
+        "name": "Réponse non autorisée",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          608,
+          320
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ ok: false, error: 'unauthorized' }) }}",
+          "options": {
+            "responseCode": 401
+          }
+        }
+      },
+      {
+        "id": "612ae251-5d04-4fdf-8f85-314a3ab5d207",
+        "name": "Heartbeat capture",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [1056, 208],
+        "parameters": {
+          "method": "POST",
+          "url": "={{ $env.MEMO_BRIDGE_URL + '/heartbeat/capture' }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              { "name": "Authorization", "value": "={{ 'Bearer ' + $env.MEMO_TOKEN }}" }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({}) }}",
+          "options": { "timeout": 10000 }
+        }
+      }
+    ],
+    "connections": {
+      "Memo Bridge": {
+        "main": [
+          [
+            {
+              "node": "Notion: créer page",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Notion: créer page": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Heartbeat capture",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Capture token valide",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Capture token valide": {
+        "main": [
+          [
+            {
+              "node": "Memo Bridge",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Réponse non autorisée",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "availableInMCP": true,
+      "timeSavedMode": "fixed",
+      "callerPolicy": "workflowsFromSameOwner",
+      "errorWorkflow": "globalErrorMonitor"
+    },
+    "staticData": null,
+    "meta": {
+      "templateCredsSetupCompleted": true,
+      "aiBuilderAssisted": true,
+      "builderVariant": "mcp"
+    },
+    "nodeGroups": [],
+    "pinData": {},
+    "versionId": "f2beb3f5-92a2-498a-bfd7-9f655bdf7b49",
+    "activeVersionId": "f2beb3f5-92a2-498a-bfd7-9f655bdf7b49",
+    "versionCounter": 11,
+    "triggerCount": 1,
+    "sourceWorkflowId": null,
+    "tags": [],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  }
+]

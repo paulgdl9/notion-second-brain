@@ -1,0 +1,792 @@
+[
+  {
+    "updatedAt": "2026-06-21T13:11:44.335Z",
+    "createdAt": "2026-06-20T11:39:59.502Z",
+    "id": "hB7QvnPqejSe6LtU",
+    "name": "Daily Brief (Inbox IA)",
+    "description": "Génère le Daily Brief depuis Inbox IA, utilise un fallback si Claude est indisponible, puis marque les captures comme Briefed avec leur date de passage.",
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "resource": "databasePage",
+          "operation": "getAll",
+          "databaseId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_INBOX_DATABASE_ID }}",
+            "mode": "id",
+            "cachedResultName": "Inbox IA"
+          },
+          "options": {}
+        },
+        "id": "e6d82f34-1163-4292-8f50-6a15f0c138b2",
+        "name": "Inbox IA — pages",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          448,
+          208
+        ],
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion API"
+          }
+        },
+        "alwaysOutputData": true
+      },
+      {
+        "parameters": {
+          "jsCode": "const today = new Date().toLocaleDateString('fr-FR');\nconst inboxRows = $input.all();\nif (inboxRows.some(i => i.json && i.json.error)) throw new Error('Unable to read Inbox IA from Notion');\nconst valueOf = (obj, names) => { for (const name of names) { const value = obj[name]; if (value !== undefined && value !== null && value !== '') return value; } return ''; };\nconst toText = (value) => { if (value === undefined || value === null) return ''; if (Array.isArray(value)) return value.map(toText).filter(Boolean).join(', '); if (typeof value === 'object') return value.name || value.value || value.plain_text || (value.text && value.text.content) || ''; return value.toString(); };\nconst toTags = (value) => { if (!value) return []; const tags = Array.isArray(value) ? value : [value]; return tags.map(toText).filter(Boolean); };\nconst items = [];\nfor (const input of inboxRows) {\n  const j = input.json;\n  const p = j.properties || {};\n  const data = { ...p, ...j };\n  const status = toText(valueOf(data, ['property_status', 'Status', 'status']));\n  if (status && status !== 'Inbox') continue;\n  const title = toText(valueOf(data, ['property_name', 'name', 'Name', 'Title', 'title']));\n  const summary = toText(valueOf(data, ['property_summary', 'summary', 'Summary']));\n  const source = toText(valueOf(data, ['property_source', 'source', 'Source']));\n  const url = toText(valueOf(data, ['property_url', 'url', 'URL']));\n  const tags = toTags(valueOf(data, ['property_tags', 'tags', 'Tags']));\n  if (!title && !summary) continue;\n  items.push({ id: j.id, title, source, summary, tags, url });\n}\nreturn [{ json: { date: today, items: items.slice(0, 20), count: items.length } }];"
+        },
+        "id": "f95e7972-cd3b-4821-bada-3937b8726751",
+        "name": "Préparer",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          672,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "={{ $env.MEMO_BRIDGE_URL + '/brief' }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "={{ 'Bearer ' + $env.MEMO_TOKEN }}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json) }}",
+          "options": {
+            "timeout": 230000
+          }
+        },
+        "id": "f5c744d9-ad44-4783-922f-ddb5472ce55b",
+        "name": "Memo Bridge /brief",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1340,
+          208
+        ],
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "={{ 'https://api.notion.com/v1/blocks/' + $env.NOTION_DAILY_BRIEF_PAGE_ID + '/children' }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "notionApi",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Notion-Version",
+                "value": "2022-06-28"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json.body) }}",
+          "options": {}
+        },
+        "id": "28710fd7-2c0a-43ed-8c73-58eb03f09bc6",
+        "name": "Notion: écrire le brief",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1780,
+          208
+        ],
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const items = $('Préparer').first().json.items || [];\nreturn items.filter(i => i.id).map(i => ({ json: { id: i.id } }));"
+        },
+        "id": "297d9129-31f5-4239-9b08-e35105f1d83f",
+        "name": "IDs à traiter",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2000,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "resource": "databasePage",
+          "operation": "update",
+          "pageId": {
+            "__rl": true,
+            "value": "={{ $json.id }}",
+            "mode": "id"
+          },
+          "propertiesUi": {
+            "propertyValues": [
+              {
+                "key": "Status|select",
+                "selectValue": "Briefed"
+              },
+              {
+                "key": "Briefed At|date",
+                "date": "={{ $now.toISO() }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "796a9e38-26bf-4ef7-b7ea-ed47d193b937",
+        "name": "Marquer Briefed",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          2220,
+          208
+        ],
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const incoming = $input.first()?.json || {};\nif (Array.isArray(incoming.blocks) && incoming.blocks.length) {\n  return $input.all();\n}\n\nconst prepared = $('Préparer').first().json || {};\nconst items = Array.isArray(prepared.items) ? prepared.items : [];\nconst date = prepared.date || new Date().toLocaleDateString('fr-FR');\n\nconst capUtf16 = (value, limit = 1900) => {\n  const s = (value ?? '').toString();\n  let units = 0;\n  let out = '';\n  for (const ch of s) {\n    const u = ch.codePointAt(0) > 0xffff ? 2 : 1;\n    if (units + u > limit) break;\n    out += ch;\n    units += u;\n  }\n  return out;\n};\n\nconst richText = (content) => [{ type: 'text', text: { content: capUtf16(content || '') } }];\nconst block = (type, content) => ({ object: 'block', type, [type]: { rich_text: richText(content) } });\nconst divider = () => ({ object: 'block', type: 'divider', divider: {} });\n\nconst blocks = [\n  block('heading_2', `Daily Brief - ${date}`),\n  block('paragraph', 'Fallback local : le bridge /brief n’a pas renvoyé de blocs, donc ce brief reprend uniquement les captures Notion disponibles.'),\n  block('heading_3', 'Inbox du jour'),\n];\n\nif (!items.length) {\n  blocks.push(block('paragraph', 'RAS'));\n} else {\n  for (const item of items) {\n    const title = item.title || '(sans titre)';\n    const summary = item.summary || 'Pas de résumé disponible.';\n    const source = item.source ? ` · Source: ${item.source}` : '';\n    const tags = Array.isArray(item.tags) && item.tags.length ? ` · Tags: ${item.tags.join(', ')}` : '';\n    blocks.push(block('bulleted_list_item', `${title} - ${summary}${source}${tags}`));\n  }\n}\n\nblocks.push(\n  block('heading_3', 'Action du jour'),\n  block('paragraph', items.length ? 'Relire les captures ci-dessus et choisir celle qui soutient le mieux les objectifs actifs.' : 'Aucune capture à traiter.'),\n  divider()\n);\n\nreturn [{ json: { ok: true, fallback: true, brief: `Fallback local - ${date}`, blocks, count: items.length } }];"
+        },
+        "id": "c7696288-1789-4af0-a245-25d77cb4dda6",
+        "name": "Brief fallback si Claude KO",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1560,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "triggerAtHour": 7
+              }
+            ]
+          }
+        },
+        "id": "659298ad-75ab-43e9-9047-b0397518cbc1",
+        "name": "Tous les jours 7h",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          224,
+          208
+        ]
+      },
+      {
+        "id": "33c21626-6e0f-4f01-984a-052bf5631510",
+        "name": "Notes — blocs",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          900,
+          208
+        ],
+        "parameters": {
+          "resource": "block",
+          "operation": "getAll",
+          "blockId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_NOTES_PAGE_ID }}",
+            "mode": "id"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion API"
+          }
+        }
+      },
+      {
+        "id": "b12b9648-2da9-4dfa-ae41-c86e19f07da1",
+        "name": "Contexte système — blocs",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          1000,
+          208
+        ],
+        "parameters": {
+          "resource": "block",
+          "operation": "getAll",
+          "blockId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_CONTEXT_PAGE_ID }}",
+            "mode": "id"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion API"
+          }
+        },
+        "onError": "continueRegularOutput",
+        "alwaysOutputData": true,
+        "executeOnce": true
+      },
+      {
+        "id": "12de53c4-f020-491a-a82c-9716d0ca6189",
+        "name": "Enrichir payload",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1120,
+          208
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "const STALE_DAYS = 7;\nconst COMPLETED_LOOKBACK_DAYS = 3;\nconst nowD = new Date();\nconst sourceNodes = ['Notes — blocs', 'Contexte système — blocs', 'Objectifs — actifs', 'Tâches — ouvertes'];\nfor (const name of sourceNodes) { if ($(name).all().some(i => i.json && i.json.error)) throw new Error('Notion read failed: ' + name); }\nconst getText = (block) => { if (typeof block.content === 'string') return block.content; const type = block.type; const c = block[type]; if (!c) return ''; const rt = c.rich_text || []; return rt.map(t => t.plain_text || '').join(''); };\nconst isChecked = (block) => (block.checked !== undefined ? block.checked : ((block.to_do || {}).checked || false));\nconst noteBlocks = $('Notes — blocs').all().map(i => i.json).filter(b => b && b.type);\nlet section = null; const aujourdHui = [], journal = [], todos = []; let journalDate = null;\nfor (const block of noteBlocks) {\n  const text = getText(block); const type = block.type;\n  if (type === 'heading_2' || type === 'heading_1') {\n    if (text.includes('Aujourd')) section = 'aujourdhui';\n    else if (text.includes('Journal')) section = 'journal';\n    else if (text.includes('Todo') || text.includes('✅')) section = 'todos';\n    else if (text.includes('Archive') || text.includes('🗄')) break;\n    else section = null;\n    continue;\n  }\n  if (type === 'heading_3' && section === 'journal') { if (journalDate !== null) break; journalDate = text; continue; }\n  if (!text) continue;\n  if (section === 'aujourdhui') aujourdHui.push(text);\n  else if (section === 'journal' && journalDate !== null) journal.push(text);\n  else if (section === 'todos') { todos.push((isChecked(block) ? '✓' : '☐') + ' ' + text); }\n}\nconst parts = [];\nif (aujourdHui.length) parts.push('Notes du jour :\\n' + aujourdHui.map(l => '- ' + l).join('\\n'));\nif (journalDate && journal.length) parts.push('Journal (' + journalDate + ') :\\n' + journal.map(l => '- ' + l).join('\\n'));\nif (todos.length) parts.push('Todos en cours :\\n' + todos.join('\\n'));\nconst context = parts.join('\\n\\n').slice(0, 3000);\nconst systemLines = [];\nfor (const block of $('Contexte système — blocs').all().map(i => i.json).filter(b => b && b.type)) {\n  const text = getText(block).trim();\n  if (!text) continue;\n  systemLines.push(block.type.startsWith('heading_') ? '## ' + text : '- ' + text);\n}\nconst system_context = systemLines.join('\\n').slice(0, 12000);\nconst norm = (s) => s.toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '');\nconst toText = (value) => { if (value === undefined || value === null) return ''; if (Array.isArray(value)) return value.map(toText).filter(Boolean).join(', '); if (typeof value === 'object') return value.name || value.value || value.plain_text || value.start || (value.text && value.text.content) || ''; return value.toString(); };\nconst mapOf = (j) => { const m = {}; const src = { ...(j.properties || {}), ...j }; for (const k of Object.keys(src)) { const key = k.startsWith('property_') ? k.slice(9) : k; m[norm(key)] = src[k]; } return m; };\nconst field = (m, names) => { for (const n of names) { const v = toText(m[n]); if (v) return v; } return ''; };\nconst objectives = [];\nfor (const it of $('Objectifs — actifs').all()) {\n  const m = mapOf(it.json || {});\n  const nom = field(m, ['nom', 'name']);\n  if (!nom) continue;\n  const statut = field(m, ['statut']);\n  if (statut && statut !== 'Actif') continue;\n  objectives.push({ nom, domaine: field(m, ['domaine']), priorite: field(m, ['priorite', 'priorit']), etat: field(m, ['etatactuel', 'tatactuel']), prochaine_etape: field(m, ['prochaineetape', 'prochainetape']), horizon: field(m, ['horizon']) });\n}\nconst open_tasks = [];\nfor (const it of $('Tâches — ouvertes').all()) {\n  const m = mapOf(it.json || {});\n  const titre = field(m, ['tache', 'tche', 'name']);\n  if (!titre) continue;\n  const statut = field(m, ['statut']);\n  if (statut && statut !== 'À faire') continue;\n  const d = field(m, ['proposeele', 'proposele']);\n  if (d) { const age = (nowD - new Date(d)) / 86400000; if (age > STALE_DAYS) continue; }\n  open_tasks.push({ titre, domaine: field(m, ['domaine']), pourquoi: field(m, ['pourquoi']), feedback: field(m, ['retour', 'resultat', 'bilan', 'blocage']), propose_le: d });\n}\nconst completed_tasks = [];\nfor (const it of $('Tâches — ouvertes').all()) {\n  const m = mapOf(it.json || {});\n  const titre = field(m, ['tache', 'tche', 'name']);\n  if (!titre || field(m, ['statut']) !== 'Fait') continue;\n  const completedAt = field(m, ['faitele', 'termineele', 'terminele', 'completedat', 'lasteditedtime']);\n  if (!completedAt) continue;\n  const age = (nowD - new Date(completedAt)) / 86400000;\n  if (!Number.isFinite(age) || age < 0 || age > COMPLETED_LOOKBACK_DAYS) continue;\n  completed_tasks.push({ titre, domaine: field(m, ['domaine']), pourquoi: field(m, ['pourquoi']), feedback: field(m, ['retour', 'resultat', 'bilan', 'blocage']), terminee_le: completedAt });\n}\ncompleted_tasks.sort((a, b) => new Date(b.terminee_le) - new Date(a.terminee_le));\nconst prepared = $('Préparer').first().json || {};\nreturn [{ json: { ...prepared, context, system_context, objectives, open_tasks, completed_tasks: completed_tasks.slice(0, 10) } }];"
+        }
+      },
+      {
+        "id": "523bbe29-7f2e-43d5-b749-3fa68a760787",
+        "name": "Objectifs — actifs",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          1000,
+          380
+        ],
+        "parameters": {
+          "resource": "databasePage",
+          "operation": "getAll",
+          "databaseId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_OBJECTIVES_DATABASE_ID }}",
+            "mode": "id",
+            "cachedResultName": "🎯 Objectifs"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion API"
+          }
+        },
+        "onError": "continueRegularOutput",
+        "alwaysOutputData": true,
+        "executeOnce": true
+      },
+      {
+        "id": "aa966cb5-b48c-4b07-a191-0d85cc9e9ed8",
+        "name": "Tâches — ouvertes",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          1160,
+          380
+        ],
+        "parameters": {
+          "resource": "databasePage",
+          "operation": "getAll",
+          "databaseId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_TASKS_DATABASE_ID }}",
+            "mode": "id",
+            "cachedResultName": "✅ Tâches"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion API"
+          }
+        },
+        "onError": "continueRegularOutput",
+        "alwaysOutputData": true,
+        "executeOnce": true
+      },
+      {
+        "id": "fa6be469-808c-4ab3-bc39-c7dc98ef1a04",
+        "name": "Tâches à créer",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2000,
+          380
+        ],
+        "parameters": {
+          "jsCode": "const out = $('Brief fallback si Claude KO').first().json || {};\nconst tasks = Array.isArray(out.tasks) ? out.tasks : [];\nconst open = (($('Enrichir payload').first().json || {}).open_tasks) || [];\nconst norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '');\nconst blocked = new Set(open.map(t => norm(t.titre)));\nconst seen = new Set();\nconst res = [];\nfor (const t of tasks) {\n  if (!t || !t.titre) continue;\n  const k = norm(t.titre);\n  if (!k || blocked.has(k) || seen.has(k)) continue;\n  seen.add(k);\n  res.push({ json: { titre: t.titre, domaine: t.domaine || 'Knowledge', pourquoi: t.pourquoi || '' } });\n}\nreturn res;"
+        }
+      },
+      {
+        "id": "e529f3ae-34fd-4f4a-bdb5-fc0db77e629f",
+        "name": "Créer Tâches",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          2220,
+          380
+        ],
+        "parameters": {
+          "resource": "databasePage",
+          "operation": "create",
+          "databaseId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_TASKS_DATABASE_ID }}",
+            "mode": "id",
+            "cachedResultName": "✅ Tâches"
+          },
+          "propertiesUi": {
+            "propertyValues": [
+              {
+                "key": "Tâche|title",
+                "title": "={{ $json.titre }}"
+              },
+              {
+                "key": "Statut|select",
+                "selectValue": "À faire"
+              },
+              {
+                "key": "Domaine|select",
+                "selectValue": "={{ $json.domaine }}"
+              },
+              {
+                "key": "Pourquoi|rich_text",
+                "textContent": "={{ $json.pourquoi }}"
+              },
+              {
+                "key": "Source|select",
+                "selectValue": "Brief"
+              },
+              {
+                "key": "Proposée le|date",
+                "date": "={{ $now.toISO() }}",
+                "includeTime": false
+              }
+            ]
+          },
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion API"
+          }
+        }
+      },
+      {
+        "id": "66a36361-4458-48fe-aa77-c5aafc2d6ad1",
+        "name": "Brief: 1er bloc",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          1560,
+          380
+        ],
+        "parameters": {
+          "resource": "block",
+          "operation": "getAll",
+          "blockId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_DAILY_BRIEF_PAGE_ID }}",
+            "mode": "id"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion API"
+          }
+        },
+        "onError": "continueRegularOutput",
+        "alwaysOutputData": true,
+        "executeOnce": true
+      },
+      {
+        "id": "ee2d4c8c-5c2f-40b8-8317-7e7cf67f2400",
+        "name": "Payload écriture",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1680,
+          208
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "const fb = $('Brief fallback si Claude KO').first().json || {};\nconst blocks = Array.isArray(fb.blocks) ? fb.blocks : [];\nconst firstBlocks = $('Brief: 1er bloc').all().map(i => i.json).filter(b => b && b.id);\nconst after = firstBlocks.length ? firstBlocks[0].id : null;\nconst children = [{ object: 'block', type: 'divider', divider: {} }].concat(blocks);\nconst body = after ? { children, after } : { children };\nreturn [{ json: { body } }];"
+        }
+      },
+      {
+        "id": "24be67d9-cbb3-47e9-b480-b7a33dd4ac29",
+        "name": "Tâches périmées",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1340,
+          540
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "const STALE_DAYS = 7;\nconst nowD = new Date();\nconst norm = (s) => s.toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '');\nconst toText = (value) => { if (value === undefined || value === null) return ''; if (Array.isArray(value)) return value.map(toText).filter(Boolean).join(', '); if (typeof value === 'object') return value.name || value.value || value.plain_text || value.start || (value.text && value.text.content) || ''; return value.toString(); };\nconst mapOf = (j) => { const m = {}; const src = { ...(j.properties || {}), ...j }; for (const k of Object.keys(src)) { const key = k.startsWith('property_') ? k.slice(9) : k; m[norm(key)] = src[k]; } return m; };\nconst field = (m, names) => { for (const n of names) { const v = toText(m[n]); if (v) return v; } return ''; };\nconst out = [];\nfor (const it of $('Tâches — ouvertes').all()) {\n  const j = it.json || {}; if (!j.id) continue;\n  const m = mapOf(j);\n  if (field(m, ['statut']) !== 'À faire') continue;\n  const d = field(m, ['proposeele', 'proposele']);\n  if (!d) continue;\n  const age = (nowD - new Date(d)) / 86400000;\n  if (age > STALE_DAYS) out.push({ json: { id: j.id } });\n}\nreturn out;"
+        }
+      },
+      {
+        "id": "5180d605-b72c-47d6-a915-03c4501a3eb6",
+        "name": "Abandonner tâches",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          1540,
+          540
+        ],
+        "parameters": {
+          "resource": "databasePage",
+          "operation": "update",
+          "pageId": {
+            "__rl": true,
+            "value": "={{ $json.id }}",
+            "mode": "id"
+          },
+          "propertiesUi": {
+            "propertyValues": [
+              {
+                "key": "Statut|select",
+                "selectValue": "Abandonnée"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion API"
+          }
+        }
+      },
+      {
+        "id": "18c2c166-2039-40b1-bbd8-182e418fcb37",
+        "name": "Détecter dégradation",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1780,
+          420
+        ],
+        "parameters": {
+          "jsCode": "const fb = $('Brief fallback si Claude KO').first().json || {};\nconst engine = fb.engine || (fb.fallback ? 'none' : 'claude');\nconst context_source = fb.context_source || 'fallback';\nif (engine === 'claude' && context_source === 'notion') return [];\nconst date = $('Préparer').first().json.date || new Date().toLocaleDateString('fr-FR');\nreturn [{ json: { engine, context_source, date } }];"
+        }
+      },
+      {
+        "id": "cf86e0c7-c136-417b-8b17-f88d00094e28",
+        "name": "Alerte Telegram",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2000,
+          420
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "={{ 'https://api.telegram.org/bot' + $env.TELEGRAM_BOT_TOKEN + '/sendMessage' }}",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: 'Daily Brief - degradation\\n\\nMoteur : ' + $json.engine + '\\nContexte : ' + $json.context_source + '\\nDate : ' + $json.date + '\\n\\n' + ($json.context_source !== 'notion' ? 'La page Contexte systeme est indisponible ; aucun profil statique injecte. ' : '') + ($json.engine !== 'claude' ? 'Moteur de repli utilise.' : '') }) }}",
+          "options": {
+            "timeout": 15000
+          }
+        }
+      },
+      {
+        "id": "9bef7031-45ab-455e-8631-aa30a6d97a29",
+        "name": "Heartbeat Daily Brief",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [1780, 300],
+        "parameters": {
+          "method": "POST",
+          "url": "={{ $env.MEMO_BRIDGE_URL + '/heartbeat/brief' }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              { "name": "Authorization", "value": "={{ 'Bearer ' + $env.MEMO_TOKEN }}" }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ date: $('Préparer').first().json.date, engine: $('Brief fallback si Claude KO').first().json.engine || 'none', context_source: $('Brief fallback si Claude KO').first().json.context_source || 'missing' }) }}",
+          "options": { "timeout": 10000 }
+        }
+      }
+    ],
+    "connections": {
+      "Inbox IA — pages": {
+        "main": [
+          [
+            {
+              "node": "Préparer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Notion: écrire le brief": {
+        "main": [
+          [
+            {
+              "node": "IDs à traiter",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Tâches à créer",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Heartbeat Daily Brief",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IDs à traiter": {
+        "main": [
+          [
+            {
+              "node": "Marquer Briefed",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Memo Bridge /brief": {
+        "main": [
+          [
+            {
+              "node": "Brief fallback si Claude KO",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Tous les jours 7h": {
+        "main": [
+          [
+            {
+              "node": "Inbox IA — pages",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Préparer": {
+        "main": [
+          [
+            {
+              "node": "Notes — blocs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Enrichir payload": {
+        "main": [
+          [
+            {
+              "node": "Memo Bridge /brief",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Notes — blocs": {
+        "main": [
+          [
+            {
+              "node": "Contexte système — blocs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Contexte système — blocs": {
+        "main": [
+          [
+            {
+              "node": "Objectifs — actifs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Objectifs — actifs": {
+        "main": [
+          [
+            {
+              "node": "Tâches — ouvertes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Tâches — ouvertes": {
+        "main": [
+          [
+            {
+              "node": "Enrichir payload",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Tâches périmées",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Tâches à créer": {
+        "main": [
+          [
+            {
+              "node": "Créer Tâches",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Brief fallback si Claude KO": {
+        "main": [
+          [
+            {
+              "node": "Brief: 1er bloc",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Détecter dégradation",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Brief: 1er bloc": {
+        "main": [
+          [
+            {
+              "node": "Payload écriture",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Payload écriture": {
+        "main": [
+          [
+            {
+              "node": "Notion: écrire le brief",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Tâches périmées": {
+        "main": [
+          [
+            {
+              "node": "Abandonner tâches",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Détecter dégradation": {
+        "main": [
+          [
+            {
+              "node": "Alerte Telegram",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "availableInMCP": true,
+      "timeSavedMode": "fixed",
+      "callerPolicy": "workflowsFromSameOwner",
+      "errorWorkflow": "globalErrorMonitor"
+    },
+    "staticData": {
+      "node:Tous les jours 7h": {
+        "recurrenceRules": []
+      },
+      "node:Tous les jours 4h": {
+        "recurrenceRules": []
+      }
+    },
+    "meta": {
+      "templateCredsSetupCompleted": true,
+      "aiBuilderAssisted": true,
+      "builderVariant": "mcp"
+    },
+    "nodeGroups": [],
+    "pinData": {},
+    "versionId": "8f1e4b49-660a-4abc-84fd-eabe4ce66506",
+    "activeVersionId": "8f1e4b49-660a-4abc-84fd-eabe4ce66506",
+    "versionCounter": 35,
+    "triggerCount": 1,
+    "sourceWorkflowId": null,
+    "tags": [],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  }
+]
