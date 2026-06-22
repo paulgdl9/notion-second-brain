@@ -2,7 +2,7 @@
   {
     "id": "weeklyReviewNotion",
     "name": "Weekly Review",
-    "description": "Builds an evidence-based weekly review from Notion every Sunday evening.",
+    "description": "Builds an evidence-based weekly review in Daily Brief every Sunday evening.",
     "active": true,
     "isArchived": false,
     "nodes": [
@@ -52,7 +52,7 @@
           "operation": "getAll",
           "blockId": {
             "__rl": true,
-            "value": "={{ $env.NOTION_WEEKLY_REVIEWS_PAGE_ID }}",
+            "value": "={{ $env.NOTION_DAILY_BRIEF_PAGE_ID }}",
             "mode": "id"
           },
           "returnAll": true,
@@ -355,7 +355,7 @@
         ],
         "parameters": {
           "method": "PATCH",
-          "url": "={{ 'https://api.notion.com/v1/blocks/' + $env.NOTION_WEEKLY_REVIEWS_PAGE_ID + '/children' }}",
+          "url": "={{ 'https://api.notion.com/v1/blocks/' + $env.NOTION_DAILY_BRIEF_PAGE_ID + '/children' }}",
           "authentication": "predefinedCredentialType",
           "nodeCredentialType": "notionApi",
           "sendHeaders": true,
@@ -608,9 +608,9 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": {},
-    "versionId": "c277d3f1-70b0-436e-93c9-4991261b2965",
-    "activeVersionId": "c277d3f1-70b0-436e-93c9-4991261b2965",
-    "versionCounter": 1,
+    "versionId": "feb08dca-c169-4ec2-b319-53a00ef3d525",
+    "activeVersionId": "feb08dca-c169-4ec2-b319-53a00ef3d525",
+    "versionCounter": 2,
     "triggerCount": 1,
     "sourceWorkflowId": null,
     "tags": []

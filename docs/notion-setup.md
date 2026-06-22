@@ -72,7 +72,6 @@ The brief proposes 1–3 tasks/day here; still-open and recently-completed tasks
 | Page             | `.env` variable             | Role                                                                 |
 |------------------|-----------------------------|----------------------------------------------------------------------|
 | Daily Brief      | `NOTION_DAILY_BRIEF_PAGE_ID`| Brief output. Keep a permanent first block as a header — new briefs are inserted right after it (most recent on top). |
-| Weekly Reviews   | `NOTION_WEEKLY_REVIEWS_PAGE_ID` | Weekly output. Keep a permanent first block as a header; the newest review is inserted after it. |
 | Notes            | `NOTION_NOTES_PAGE_ID`      | Journal. Recognized `heading_2`/`heading_1` sections: `Today`, `Journal`, and `Todo`/`✅`. The Daily Brief moves `Today` under yesterday's Journal date, then clears it. An `Archive`/`🗄` heading ends parsing. |
 | System Context   | `NOTION_CONTEXT_PAGE_ID`    | Free text read each morning as the brief's system context (who you are, projects, priorities, copilot rules). No personal data lives in the code. |
 
@@ -83,8 +82,8 @@ The Notes rollover runs only when a new Daily Brief is due. It writes a `Daily n
 yesterday's Journal date before clearing `Today`; retries detect that marker and never duplicate the
 archived notes.
 
-Weekly Review runs every Sunday at 19:00 using the instance timezone. Its dedicated destination
-prevents weekly content from changing the Daily Brief insertion anchor. The optional
+Weekly Review runs every Sunday at 19:00 using the instance timezone. It shares the Daily Brief
+page and inserts after the same permanent header, so no additional Notion page is required. The optional
 `NOTION_LIBRARY_DATABASE_ID` may point to a shared Readwise or other Library database; leave it
 empty to omit that source.
 
@@ -102,7 +101,6 @@ Copy the ID from each Notion URL into `.env`. The ID is the 32-character hex str
 ```
 NOTION_INBOX_DATABASE_ID=
 NOTION_DAILY_BRIEF_PAGE_ID=
-NOTION_WEEKLY_REVIEWS_PAGE_ID=
 NOTION_NOTES_PAGE_ID=
 NOTION_CONTEXT_PAGE_ID=
 NOTION_OBJECTIVES_DATABASE_ID=

@@ -65,7 +65,8 @@ class WorkflowContractTests(unittest.TestCase):
             nodes["Every Sunday at 19:00"]["parameters"]["rule"]["interval"][0]["expression"],
             "0 19 * * 0",
         )
-        self.assertIn("NOTION_WEEKLY_REVIEWS_PAGE_ID", content)
+        self.assertIn("NOTION_DAILY_BRIEF_PAGE_ID", content)
+        self.assertNotIn("NOTION_WEEKLY_REVIEWS_PAGE_ID", content)
         self.assertIn("$env.MEMO_BRIDGE_URL + '/weekly'", content)
         self.assertIn("Run manually", nodes)
         self.assertNotRegex(content, r"[0-9a-f]{32}")

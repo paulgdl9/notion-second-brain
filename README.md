@@ -81,7 +81,8 @@ clears `Today` without duplicating content on retries.
 All personal context and behavioral rules come from the Notion page `System Context`. The bridge
 contains no personal fallback and refuses contextual generation when that page is unavailable.
 
-Weekly Review runs on Sunday at 19:00 and writes to its own Notion page. It treats `Done on` and
+Weekly Review runs on Sunday at 19:00 and writes at the top of `Daily Brief`, just after its
+permanent header. It treats `Done on` and
 dated Journal entries as execution evidence, treats Daily Briefs only as intentions, avoids counting
 the same signal twice, and proposes exact objective updates without applying them. Its public prompt
 is versioned in `prompts/weekly-review.md`; identity and priorities still come only from

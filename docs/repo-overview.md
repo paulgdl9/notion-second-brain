@@ -244,7 +244,6 @@ Every resource must be explicitly shared with the Notion integration configured 
 | Resource | Variable | Purpose |
 |----------|----------|---------|
 | Daily Brief | `NOTION_DAILY_BRIEF_PAGE_ID` | brief destination |
-| Weekly Reviews | `NOTION_WEEKLY_REVIEWS_PAGE_ID` | weekly review destination |
 | Notes | `NOTION_NOTES_PAGE_ID` | recent journal and todos |
 | Objectives | `NOTION_OBJECTIVES_DATABASE_ID` | active objectives |
 | Tasks | `NOTION_TASKS_DATABASE_ID` | task feedback loop |
@@ -281,7 +280,7 @@ fallback. Generation routes report `claude`, `codex`, or `none` in the `engine` 
 
 Every Sunday at 19:00, `Weekly Review` reads System Context, the week's Daily Briefs, dated Journal
 entries and todos, Objectives, Tasks, and the optional Library database. It calls `/weekly`, then
-inserts the result after the permanent first block of the dedicated Weekly Reviews page. A matching
+inserts the result after the permanent first block of the Daily Brief page. A matching
 week heading stops a retry before any additional generation.
 
 The evidence contract is deliberately stricter than the Daily Brief: a task counts as execution
