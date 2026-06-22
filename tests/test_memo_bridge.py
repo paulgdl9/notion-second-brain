@@ -29,10 +29,10 @@ class BriefPromptTests(unittest.TestCase):
             system_context="Situation actuelle depuis Notion",
         )
 
-        self.assertIn("TÂCHES TERMINÉES RÉCEMMENT", prompt)
+        self.assertIn("RECENTLY COMPLETED TASKS", prompt)
         self.assertIn("Envoyer cinq messages", prompt)
         self.assertIn("Deux reponses", prompt)
-        self.assertIn("Une tâche marquée Fait prouve son exécution, pas son résultat", prompt)
+        self.assertIn("A task marked Done proves it was executed, not its result", prompt)
         self.assertIn("Situation actuelle depuis Notion", prompt)
 
     def test_no_personal_context_is_injected_when_context_is_empty(self):
