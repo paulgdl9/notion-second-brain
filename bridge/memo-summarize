@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ~/.local/bin n'est PAS dans le PATH d'un SSH/HTTP non-interactif : on prend
-# CLAUDE_BIN de l'environnement (fourni par le bridge / .env), sinon le PATH.
+# ~/.local/bin may be absent from non-interactive SSH/HTTP PATHs. Prefer
+# CLAUDE_BIN from the bridge environment/.env, then fall back to PATH.
 CLAUDE_BIN="${CLAUDE_BIN:-$(command -v claude || echo claude)}"
 
 input="$(cat)"
@@ -32,9 +32,9 @@ PROMPT
 )"
 prompt="${prompt/__AREAS__/$areas}"
 
-# --strict-mcp-config sans --mcp-config => zéro serveur MCP chargé :
-# plus rapide, et garde Claude en simple résumeur (recommandation sécurité).
+# --strict-mcp-config without --mcp-config loads no MCP servers. This is faster
+# and keeps Claude limited to summarization.
 exec "$CLAUDE_BIN" -p --strict-mcp-config --model claude-haiku-4-5-20251001 "$prompt
 
-CONTENU À ANALYSER :
+CONTENT TO ANALYZE:
 $input"

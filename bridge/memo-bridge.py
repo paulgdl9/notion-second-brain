@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Pont moindre-privilège entre n8n et claude.
-n8n POST /summarize {source,url,text} -> objet enrichi prêt pour Notion.
+"""Least-privilege bridge between n8n and Claude.
+n8n POST /summarize {source,url,text} -> enriched object ready for Notion.
 
-- Récupère le contenu des URLs AVANT de résumer (tweets via fxtwitter, pages web),
-  car claude -p n'a pas d'accès web.
-- Déduit la source (Twitter / Article) si non fournie.
-- Crée TOUJOURS une capture (fallback) plutôt que d'échouer en 502."""
+- Fetches URL content before summarizing it (tweets via FxTwitter, web pages),
+  because claude -p has no web access.
+- Infers the source (Twitter / Article) when none is provided.
+- Always creates a capture through a fallback instead of failing with a 502.
+"""
 import json, os, re, shutil, subprocess, hmac, tempfile, urllib.request
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,8 +14,8 @@ from pathlib import Path
 
 TOKEN = os.environ.get("MEMO_TOKEN", "")
 PORT = int(os.environ.get("MEMO_PORT", "8088"))
-# Chemins resolus depuis l'environnement, sinon decouverte sur le PATH, sinon nom nu.
-# Aucune valeur specifique a une machine n'est codee en dur (portabilite / open source).
+# Resolve paths from the environment, then PATH, then the bare command name.
+# No machine-specific value is hard-coded (portability / open source).
 SUMMARIZER = os.environ.get("MEMO_SUMMARIZER") or str(Path(__file__).resolve().parent / "memo-summarize")
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN") or shutil.which("claude") or "claude"
 CODEX_BIN = os.environ.get("CODEX_BIN") or shutil.which("codex") or "codex"
@@ -28,7 +29,7 @@ URL_RE = re.compile(r"https?://[^\s]+")
 TWEET_RE = re.compile(r"https?://(?:www\.|mobile\.)?(?:x\.com|twitter\.com)/", re.I)
 PRIVATE_RE = re.compile(r"^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)", re.I)
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-RAW_MAX = 1900  # propriété rich_text Notion ~2000 chars
+RAW_MAX = 1900  # Notion rich_text properties are limited to about 2,000 characters.
 
 
 def authorized(headers):
@@ -76,20 +77,20 @@ def fetch_tweet(url):
         t = (json.loads(body).get("tweet") or {})
         a = t.get("author") or {}
         who = "%s (@%s)" % (a.get("name", ""), a.get("screen_name", ""))
-        # Post long-format X (Article) : le contenu est dans article.content.blocks
+        # Long-form X post (Article): content lives in article.content.blocks.
         art = t.get("article")
         if isinstance(art, dict) and isinstance(art.get("content"), dict):
             blocks = art["content"].get("blocks") or []
-            corps = "\n".join(b.get("text", "") for b in blocks if b.get("text"))
-            if corps:
-                return "Article X de %s — %s\n\n%s" % (who, art.get("title", ""), corps)
-        # Tweet normal / note ; si text vide, prendre raw_text
+            body = "\n".join(b.get("text", "") for b in blocks if b.get("text"))
+            if body:
+                return "X article by %s — %s\n\n%s" % (who, art.get("title", ""), body)
+        # Regular tweet/note; fall back to raw_text when text is empty.
         txt = t.get("text") or ""
         if not txt:
             rt = t.get("raw_text")
             txt = rt.get("text", "") if isinstance(rt, dict) else (rt or "")
         if txt:
-            return "Tweet de %s :\n%s" % (who, txt)
+            return "Tweet by %s:\n%s" % (who, txt)
     except Exception:
         pass
     return ""
@@ -111,11 +112,11 @@ PAGE_MAX = 15000
 
 
 def fetch_via_jina(url):
-    """Extraction propre via jina reader (gère le JS, vire le boilerplate)."""
+    """Extract clean content through Jina Reader (handles JS and boilerplate)."""
     try:
         body, _ = http_get("https://r.jina.ai/" + url, timeout=25)
         if body.lstrip().startswith("{") and '"code"' in body[:200]:
-            return ""  # jina a renvoyé une erreur JSON (bloqué / abus)
+            return ""  # Jina returned a JSON error (blocked or rate-limited).
         return body.strip()
     except Exception:
         return ""
@@ -135,7 +136,7 @@ def fetch_page(url):
 
 
 def fetch_content(url):
-    """retourne (contenu, source_déduite)"""
+    """Return (content, inferred_source)."""
     if not is_public(url):
         return "", ""
     if TWEET_RE.match(url):
@@ -184,7 +185,7 @@ def run_codex_json(text):
 
 
 def run_summarize_engine(text):
-    """Essaie Claude Haiku, puis Codex. Renvoie (objet JSON, moteur)."""
+    """Try Claude Haiku, then Codex. Return (JSON object, engine)."""
     parsed = run_claude(text)
     if parsed:
         return parsed, "claude"
@@ -217,7 +218,7 @@ def fallback_json(text, url):
 
 
 def cap_utf16(s, limit):
-    """Notion mesure la longueur des textes en unités UTF-16 (emoji = 2). Tronque sans dépasser."""
+    """Truncate to Notion's UTF-16 text limit without splitting a character."""
     s = s or ""
     if len(s.encode("utf-16-le")) // 2 <= limit:
         return s
@@ -234,7 +235,7 @@ def cap_utf16(s, limit):
 def clean_tags(tags):
     out = []
     for t in (tags or []):
-        t = str(t).replace(",", " ").strip()  # la virgule est interdite dans une option multi_select
+        t = str(t).replace(",", " ").strip()  # Commas are forbidden in multi_select options.
         if t:
             out.append(cap_utf16(t, 90))
         if len(out) >= 10:
@@ -252,8 +253,11 @@ def run_claude_text(prompt, model):
 
 
 def run_codex_text(prompt):
-    """Fallback LLM si Claude est indisponible. Codex en mode non-interactif,
-    sandbox read-only (zéro action, pur résumeur), sortie propre via -o."""
+    """Use Codex when Claude is unavailable.
+
+    Codex runs non-interactively in a read-only sandbox and writes clean output
+    through -o.
+    """
     out_path = ""
     try:
         fd, out_path = tempfile.mkstemp(suffix=".txt")
@@ -276,7 +280,7 @@ def run_codex_text(prompt):
 
 
 def run_brief_engine(prompt, model):
-    """Essaie Claude, puis Codex en repli. Renvoie (texte, moteur)."""
+    """Try Claude, then Codex. Return (text, engine)."""
     txt = run_claude_text(prompt, model)
     if txt:
         return txt, "claude"
@@ -350,7 +354,7 @@ TASK_LINE_RE = re.compile(r"^\s*[-*]\s*\*\*\[?(.+?)\]?\*\*\s*[:·\-—]?\s*(.+?)
 
 
 def extract_tasks(brief_md):
-    """Extrait les tâches de la section ✅ Tâches du jour pour la DB Notion."""
+    """Extract tasks from the Today's tasks section for the Notion database."""
     tasks, in_section = [], False
     for raw in (brief_md or "").splitlines():
         s = raw.strip()
@@ -362,18 +366,18 @@ def extract_tasks(brief_md):
         m = TASK_LINE_RE.match(raw)
         if not m:
             continue
-        domaine = m.group(1).strip()
+        area = m.group(1).strip()
         rest = m.group(2).strip()
         if "—" in rest:
-            titre, pourquoi = rest.split("—", 1)
+            title, why = rest.split("—", 1)
         elif " - " in rest:
-            titre, pourquoi = rest.split(" - ", 1)
+            title, why = rest.split(" - ", 1)
         else:
-            titre, pourquoi = rest, ""
+            title, why = rest, ""
         tasks.append({
-            "domaine": domaine if domaine in AREAS else "Knowledge",
-            "titre": cap_utf16(titre.strip(), 200),
-            "pourquoi": cap_utf16(pourquoi.strip(), 1900),
+            "area": area if area in AREAS else infer_area(rest),
+            "title": cap_utf16(title.strip(), 200),
+            "why": cap_utf16(why.strip(), 1900),
         })
         if len(tasks) >= 5:
             break
@@ -381,7 +385,7 @@ def extract_tasks(brief_md):
 
 
 def md_to_blocks(md):
-    """Convertit le markdown du brief en blocs Notion (pour l'API append children)."""
+    """Convert brief Markdown to Notion blocks for the append-children API."""
     def rt(t):
         return [{"type": "text", "text": {"content": cap_utf16(t.replace("**", ""), 1900)}}]
     blocks = []
@@ -429,7 +433,7 @@ class H(BaseHTTPRequestHandler):
         raw = self.rfile.read(length) if length else b""
         data = json.loads(raw.decode("utf-8")) if raw else {}
         if isinstance(data, dict) and isinstance(data.get("body"), dict):
-            data = data["body"]  # n8n enveloppe parfois dans .body
+            data = data["body"]  # n8n occasionally wraps payloads in .body.
         return data
 
     def do_POST(self):
@@ -516,7 +520,7 @@ class H(BaseHTTPRequestHandler):
 
         url = (data.get("url") or "").strip() or first_url(text)
 
-        # 1) récupérer le contenu de l'URL si besoin
+        # 1) Fetch URL content when needed.
         inferred = ""
         content = text
         if url:
@@ -525,14 +529,14 @@ class H(BaseHTTPRequestHandler):
                 if text.strip() == url or len(text.strip()) <= len(url) + 15:
                     content = fetched
                 else:
-                    content = text.strip() + "\n\n--- Contenu récupéré ---\n" + fetched
+                    content = text.strip() + "\n\n--- Fetched content ---\n" + fetched
 
-        # 2) source : garder si valide, sinon déduire
+        # 2) Keep a valid source or infer one.
         source = data.get("source")
-        if source not in ("Twitter", "Mail", "IA", "Article", "Manual"):
+        if source not in ("Twitter", "Mail", "AI", "Article", "Manual"):
             source = inferred or ("Article" if url else "Manual")
 
-        # 3) résumer (sauf si on n'a qu'une URL nue) ; fallback sinon
+        # 3) Summarize unless the input is only a bare URL; otherwise use the fallback.
         parsed, engine = None, "none"
         if content.strip() and content.strip() != url:
             parsed, engine = run_summarize_engine(content)
@@ -545,7 +549,7 @@ class H(BaseHTTPRequestHandler):
             "url": url or None,
             "text": cap_utf16(content, RAW_MAX),
             "captured_at": datetime.now(timezone.utc).isoformat(),
-            "title": cap_utf16(parsed.get("title") or "(sans titre)", 200),
+            "title": cap_utf16(parsed.get("title") or "(untitled)", 200),
             "summary": cap_utf16(parsed.get("summary") or "", RAW_MAX),
             "insight": cap_utf16(parsed.get("insight") or parsed.get("summary") or "", RAW_MAX),
             "next_action": cap_utf16(parsed.get("next_action") or "", RAW_MAX),

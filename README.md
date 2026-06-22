@@ -64,16 +64,16 @@ tunnel token. Secrets live only in `.env` (never committed); `.env.example` is t
 
 | Name | Purpose |
 |------|---------|
-| Capture → Notion | Authenticated manual capture |
+| Capture - Notion (AI Inbox) | Authenticated manual capture |
 | Daily Brief | Objective-driven daily synthesis |
-| Veille automatique | Configurable RSS watch |
-| Monitoring — erreurs globales | Failure alerts for every critical workflow |
+| Automatic Watch - AI Inbox | Configurable RSS watch |
+| Global Error Monitor | Failure alerts for every critical workflow |
 
-Daily Brief is an **objective-driven copilot**: it reads the 🎯 Objectifs DB (the compass) plus open
-tasks from the ✅ Tâches DB, the Inbox IA captures, and the Notes journal. It proposes 1-3 tasks/day
-that get written back into the ✅ Tâches DB, reviews still-open tasks, and uses tasks marked `Fait`
+Daily Brief is an **objective-driven copilot**: it reads the Objectives database (the compass) plus
+open tasks from the Tasks database, AI Inbox captures, and the Notes journal. It proposes 1-3
+tasks/day that get written back into the Tasks database, reviews still-open tasks, and uses tasks marked `Done`
 in the last three days to propose the next logical step. It runs daily even with no new capture.
-All personal context and behavioral rules come from the Notion page `Contexte Système`. The bridge
+All personal context and behavioral rules come from the Notion page `System Context`. The bridge
 contains no personal fallback and refuses contextual generation when that page is unavailable.
 
 Automatic Watch runs before the Daily Brief. Feeds, keywords, age and volume limits are configured
@@ -83,8 +83,8 @@ Both bridge routes use an LLM fallback: Claude → Codex CLI (OpenAI API key, no
 needed) → local fallback. Their responses include an `engine` field (`"claude"` / `"codex"` /
 `"none"`). A **Telegram alert** fires automatically for a degraded Daily Brief.
 
-Notion resources used by the **n8n RPi** integration: Daily Brief, Notes, `Contexte Système`,
-🎯 Objectifs DB, and ✅ Tâches DB. `Contexte Système` is the runtime source for changing facts such
+Notion resources used by the **n8n RPi** integration: Daily Brief, Notes, `System Context`,
+Objectives, Tasks, and AI Inbox. `System Context` is the runtime source for changing facts such
 as employment, income, priorities, project progress, and copilot rules. Its ID is configured through
 `NOTION_CONTEXT_PAGE_ID` in `.env` rather than embedded in the workflow export.
 

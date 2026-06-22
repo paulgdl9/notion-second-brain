@@ -1,5 +1,5 @@
-# memo — capture rapide vers Inbox IA (webhook n8n)
-# Localise ce fichier (sourcé depuis bash ou zsh) ; le .env du repo est un cran au-dessus.
+# memo - quick capture to the AI Inbox (n8n webhook)
+# Locate this file when sourced from bash or zsh; the repository .env is one level above.
 _memo_self="${BASH_SOURCE[0]:-${(%):-%N}}"
 _memo_dir="$(cd "$(dirname "$_memo_self")" 2>/dev/null && pwd)"
 export N8N_SECRETS_FILE="${N8N_SECRETS_FILE:-${_memo_dir%/bridge}/.env}"
@@ -16,17 +16,17 @@ memo() {
     token="$(_memo_env_value CAPTURE_TOKEN)"
   fi
   capture_url="${N8N_CAPTURE_URL:-$(_memo_env_value N8N_CAPTURE_URL)}"
-  [ -n "$token" ] || { echo "memo: token webhook introuvable"; return 1; }
-  [ -n "$capture_url" ] || { echo "memo: N8N_CAPTURE_URL introuvable"; return 1; }
+  [ -n "$token" ] || { echo "memo: webhook token not found"; return 1; }
+  [ -n "$capture_url" ] || { echo "memo: N8N_CAPTURE_URL not found"; return 1; }
   if [ -t 0 ]; then
     if command -v pbpaste >/dev/null 2>&1; then text="$(pbpaste)"
     elif command -v wl-paste >/dev/null 2>&1; then text="$(wl-paste)"
     elif command -v xclip >/dev/null 2>&1; then text="$(xclip -o -selection clipboard)"
-    else echo "memo: pipe le texte → echo '...' | memo [source]"; return 1; fi
+    else echo "memo: pipe text with echo '...' | memo [source]"; return 1; fi
   else
     text="$(cat)"
   fi
-  [ -n "$text" ] || { echo "memo: rien à envoyer"; return 1; }
+  [ -n "$text" ] || { echo "memo: nothing to send"; return 1; }
   resp=$(printf '%s' "$text" \
     | python3 -c 'import json,sys; print(json.dumps({"source":sys.argv[1],"text":sys.stdin.read()}))' "$src" \
     | curl -sS --max-time 150 -X POST "$capture_url" \
@@ -37,8 +37,8 @@ import json,sys
 raw=sys.stdin.read()
 try:
     d=json.loads(raw)
-    print("✓ capturé : "+str(d.get("title","ok")) if d.get("ok") else "✗ échec : "+raw[:300])
+    print("captured: "+str(d.get("title","ok")) if d.get("ok") else "failed: "+raw[:300])
 except Exception:
-    print("✗ réponse: "+(raw[:300] or "(vide)"))
+    print("response: "+(raw[:300] or "(empty)"))
 '
 }

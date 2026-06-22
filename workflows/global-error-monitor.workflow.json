@@ -1,38 +1,69 @@
 [
   {
     "id": "globalErrorMonitor",
-    "name": "Monitoring — erreurs globales",
+    "name": "Global Error Monitor",
+    "description": "Reports failed n8n workflows to Telegram.",
     "active": true,
+    "isArchived": false,
     "nodes": [
       {
         "id": "2d5647dd-63a0-4c19-98b8-497579b5d101",
-        "name": "Erreur workflow",
+        "name": "Workflow error",
         "type": "n8n-nodes-base.errorTrigger",
         "typeVersion": 1,
-        "position": [320, 240],
+        "position": [
+          320,
+          240
+        ],
         "parameters": {}
       },
       {
         "id": "7eb7e7c5-9885-4d55-9830-01a768f5d102",
-        "name": "Alerte Telegram",
+        "name": "Telegram alert",
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
-        "position": [560, 240],
+        "position": [
+          560,
+          240
+        ],
         "parameters": {
           "method": "POST",
           "url": "={{ 'https://api.telegram.org/bot' + $env.TELEGRAM_BOT_TOKEN + '/sendMessage' }}",
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: 'ERREUR n8n\\n\\nWorkflow : ' + ($json.workflow?.name || 'inconnu') + '\\nNoeud : ' + ($json.execution?.lastNodeExecuted || 'inconnu') + '\\nMessage : ' + ($json.execution?.error?.message || 'erreur inconnue') + '\\nExecution : ' + ($json.execution?.url || $json.execution?.id || 'indisponible') }) }}",
-          "options": { "timeout": 15000 }
+          "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: 'N8N ERROR\\n\\nWorkflow: ' + ($json.workflow?.name || 'unknown') + '\\nNode: ' + ($json.execution?.lastNodeExecuted || 'unknown') + '\\nMessage: ' + ($json.execution?.error?.message || 'unknown error') + '\\nExecution: ' + ($json.execution?.url || $json.execution?.id || 'unavailable') }) }}",
+          "options": {
+            "timeout": 15000
+          }
         }
       }
     ],
     "connections": {
-      "Erreur workflow": { "main": [[{ "node": "Alerte Telegram", "type": "main", "index": 0 }]] }
+      "Workflow error": {
+        "main": [
+          [
+            {
+              "node": "Telegram alert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
     },
-    "settings": { "executionOrder": "v1", "availableInMCP": false },
+    "settings": {
+      "executionOrder": "v1",
+      "availableInMCP": false
+    },
+    "staticData": null,
+    "meta": null,
+    "nodeGroups": [],
     "pinData": {},
+    "versionId": "8a386f0a-d8c8-4cdd-90a7-ea0fbfab6569",
+    "activeVersionId": "8a386f0a-d8c8-4cdd-90a7-ea0fbfab6569",
+    "versionCounter": 2,
+    "triggerCount": 0,
+    "sourceWorkflowId": null,
     "tags": []
   }
 ]

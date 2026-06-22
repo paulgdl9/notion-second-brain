@@ -1,10 +1,8 @@
 [
   {
-    "updatedAt": "2026-06-20T13:41:31.784Z",
-    "createdAt": "2026-06-19T22:30:04.811Z",
     "id": "DbqnFl5IAG014bRK",
-    "name": "Capture → Notion (Inbox IA)",
-    "description": "Capture authentifiée vers Notion Inbox IA, avec résumé, insight, action proposée et domaine. Le bridge conserve un fallback si Claude est indisponible.",
+    "name": "Capture - Notion (AI Inbox)",
+    "description": "Authenticates captures, summarizes and classifies their content, then stores them in the Notion AI Inbox.",
     "active": true,
     "isArchived": false,
     "nodes": [
@@ -35,7 +33,7 @@
       {
         "parameters": {
           "method": "POST",
-        "url": "={{ $env.MEMO_BRIDGE_URL + '/summarize' }}",
+          "url": "={{ $env.MEMO_BRIDGE_URL + '/summarize' }}",
           "sendHeaders": true,
           "headerParameters": {
             "parameters": [
@@ -68,7 +66,7 @@
             "__rl": true,
             "value": "={{ $env.NOTION_INBOX_DATABASE_ID }}",
             "mode": "id",
-            "cachedResultName": "Inbox IA"
+            "cachedResultName": "AI Inbox"
           },
           "title": "={{ $json.title }}",
           "propertiesUi": {
@@ -122,7 +120,7 @@
           "options": {}
         },
         "id": "4ca8a125-0b3b-431c-8967-b02fbcac7a62",
-        "name": "Notion: créer page",
+        "name": "Notion: create page",
         "type": "n8n-nodes-base.notion",
         "typeVersion": 2.2,
         "position": [
@@ -132,7 +130,7 @@
         "credentials": {
           "notionApi": {
             "id": "__NOTION_CREDENTIAL_ID__",
-            "name": "Notion API"
+            "name": "Notion account"
           }
         }
       },
@@ -153,7 +151,7 @@
       },
       {
         "id": "2deeba7d-4fca-4eb3-b510-b64928450807",
-        "name": "Capture token valide",
+        "name": "Valid capture token",
         "type": "n8n-nodes-base.if",
         "typeVersion": 2.3,
         "position": [
@@ -188,7 +186,7 @@
       },
       {
         "id": "37f2db2a-c102-415f-984b-d30bf9762818",
-        "name": "Réponse non autorisée",
+        "name": "Unauthorized response",
         "type": "n8n-nodes-base.respondToWebhook",
         "typeVersion": 1.1,
         "position": [
@@ -208,20 +206,28 @@
         "name": "Heartbeat capture",
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
-        "position": [1056, 208],
+        "position": [
+          1056,
+          208
+        ],
         "parameters": {
           "method": "POST",
           "url": "={{ $env.MEMO_BRIDGE_URL + '/heartbeat/capture' }}",
           "sendHeaders": true,
           "headerParameters": {
             "parameters": [
-              { "name": "Authorization", "value": "={{ 'Bearer ' + $env.MEMO_TOKEN }}" }
+              {
+                "name": "Authorization",
+                "value": "={{ 'Bearer ' + $env.MEMO_TOKEN }}"
+              }
             ]
           },
           "sendBody": true,
           "specifyBody": "json",
           "jsonBody": "={{ JSON.stringify({}) }}",
-          "options": { "timeout": 10000 }
+          "options": {
+            "timeout": 10000
+          }
         }
       }
     ],
@@ -230,14 +236,14 @@
         "main": [
           [
             {
-              "node": "Notion: créer page",
+              "node": "Notion: create page",
               "type": "main",
               "index": 0
             }
           ]
         ]
       },
-      "Notion: créer page": {
+      "Notion: create page": {
         "main": [
           [
             {
@@ -257,14 +263,14 @@
         "main": [
           [
             {
-              "node": "Capture token valide",
+              "node": "Valid capture token",
               "type": "main",
               "index": 0
             }
           ]
         ]
       },
-      "Capture token valide": {
+      "Valid capture token": {
         "main": [
           [
             {
@@ -275,7 +281,7 @@
           ],
           [
             {
-              "node": "Réponse non autorisée",
+              "node": "Unauthorized response",
               "type": "main",
               "index": 0
             }
@@ -299,15 +305,11 @@
     },
     "nodeGroups": [],
     "pinData": {},
-    "versionId": "f2beb3f5-92a2-498a-bfd7-9f655bdf7b49",
-    "activeVersionId": "f2beb3f5-92a2-498a-bfd7-9f655bdf7b49",
+    "versionId": "8b14c8bf-115d-4b14-82ab-c6782eb59471",
+    "activeVersionId": "8b14c8bf-115d-4b14-82ab-c6782eb59471",
     "versionCounter": 11,
     "triggerCount": 1,
     "sourceWorkflowId": null,
-    "tags": [],
-    "versionMetadata": {
-      "name": null,
-      "description": null
-    }
+    "tags": []
   }
 ]

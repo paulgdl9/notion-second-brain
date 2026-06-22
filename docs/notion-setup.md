@@ -25,7 +25,7 @@ Captured items (manual captures + automatic RSS watch). One title + the followin
 | Property      | Type         | Options / notes                                  |
 |---------------|--------------|--------------------------------------------------|
 | *(title)*     | Title        | the database title column (e.g. `Name`)          |
-| Source        | Select       | `Twitter`, `Mail`, `IA`, `Article`, `Manual`     |
+| Source        | Select       | `Twitter`, `Mail`, `AI`, `Article`, `Manual`     |
 | URL           | URL          |                                                  |
 | Summary       | Text         |                                                  |
 | Insight       | Text         |                                                  |
@@ -35,7 +35,7 @@ Captured items (manual captures + automatic RSS watch). One title + the followin
 | Importance    | Number       | 1–5                                              |
 | Raw Content   | Text         |                                                  |
 | Captured At   | Date         |                                                  |
-| Status        | Select       | `Inbox`, `Briefed`, `Archivé`                    |
+| Status        | Select       | `Inbox`, `Briefed`, `Archived`                   |
 | Briefed At    | Date         |                                                  |
 
 ### Objectives database — `NOTION_OBJECTIVES_DATABASE_ID`
@@ -44,15 +44,15 @@ The compass that drives the Daily Brief (read-only for the stack).
 
 | Property        | Type   | Options / notes                                |
 |-----------------|--------|------------------------------------------------|
-| Nom             | Title  |                                                |
-| Domaine         | Select | must match `MEMO_AREAS`                         |
-| Statut          | Select | `Actif`, `En pause`, `Atteint`                 |
-| Priorité        | Select | `Haute`, `Moyenne`, `Basse`                    |
-| État actuel     | Text   |                                                |
-| Prochaine étape | Text   |                                                |
-| Horizon         | Text   |                                                |
+| Name          | Title  |                                                |
+| Area          | Select | must match `MEMO_AREAS`                         |
+| Status        | Select | `Active`, `Paused`, `Achieved`                  |
+| Priority      | Select | `High`, `Medium`, `Low`                         |
+| Current state | Text   |                                                |
+| Next step     | Text   |                                                |
+| Horizon       | Text   |                                                |
 
-Only objectives with `Statut = Actif` are sent to the brief.
+Only objectives with `Status = Active` are sent to the brief.
 
 ### Tasks database — `NOTION_TASKS_DATABASE_ID`
 
@@ -60,22 +60,22 @@ The brief proposes 1–3 tasks/day here; still-open and recently-completed tasks
 
 | Property    | Type   | Options / notes                                   |
 |-------------|--------|---------------------------------------------------|
-| Tâche       | Title  |                                                   |
-| Statut      | Select | `À faire`, `Fait`, `Abandonnée`                   |
-| Domaine     | Select | must match `MEMO_AREAS`                           |
-| Pourquoi    | Text   | why this task serves an objective                 |
-| Retour      | Text   | result or blocker you write back; read by the brief |
-| Source      | Select | `Brief`, `Manuel`                                 |
-| Proposée le | Date   | tasks older than ~7 days with `À faire` are auto-abandoned |
-| Faite le    | Date   | set when you mark a task `Fait`                   |
+| Task        | Title  |                                                   |
+| Status      | Select | `To do`, `Done`, `Abandoned`                      |
+| Area        | Select | must match `MEMO_AREAS`                           |
+| Why         | Text   | why this task serves an objective                 |
+| Feedback    | Text   | result or blocker you write back; read by the brief |
+| Source      | Select | `Brief`, `Manual`                                 |
+| Proposed on | Date   | tasks older than ~7 days with `To do` are auto-abandoned |
+| Done on     | Date   | set when you mark a task `Done`                   |
 
 ### Pages
 
 | Page             | `.env` variable             | Role                                                                 |
 |------------------|-----------------------------|----------------------------------------------------------------------|
 | Daily Brief      | `NOTION_DAILY_BRIEF_PAGE_ID`| Brief output. Keep a permanent first block as a header — new briefs are inserted right after it (most recent on top). |
-| Notes            | `NOTION_NOTES_PAGE_ID`      | Journal. Recognised `heading_2`/`heading_1` sections: contains `Aujourd` (today), `Journal`, `Todo`/`✅`. A `Archive`/`🗄` heading ends parsing. |
-| Contexte Système | `NOTION_CONTEXT_PAGE_ID`    | Free text read each morning as the brief's system context (who you are, projects, priorities, copilot rules). No personal data lives in the code. |
+| Notes            | `NOTION_NOTES_PAGE_ID`      | Journal. Recognized `heading_2`/`heading_1` sections: `Today`, `Journal`, and `Todo`/`✅`. An `Archive`/`🗄` heading ends parsing. |
+| System Context   | `NOTION_CONTEXT_PAGE_ID`    | Free text read each morning as the brief's system context (who you are, projects, priorities, copilot rules). No personal data lives in the code. |
 
 ## Sharing
 

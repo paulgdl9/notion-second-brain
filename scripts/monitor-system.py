@@ -117,9 +117,9 @@ def main():
     recovered = [name for name, ok in checks.items() if ok and previous.get(name) is False]
     host = socket.gethostname()
     if changed_down:
-        telegram(env, "ALERTE système (%s)\nÉchec: %s" % (host, ", ".join(changed_down)))
+        telegram(env, "SYSTEM ALERT (%s)\nFailed: %s" % (host, ", ".join(changed_down)))
     if recovered:
-        telegram(env, "RÉTABLI système (%s)\nOK: %s" % (host, ", ".join(recovered)))
+        telegram(env, "SYSTEM RECOVERED (%s)\nOK: %s" % (host, ", ".join(recovered)))
     tmp = STATE_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(checks, sort_keys=True), encoding="utf-8")
     os.replace(tmp, STATE_FILE)

@@ -1,15 +1,20 @@
 [
   {
     "id": "vRssAutoIA062026",
-    "name": "Veille automatique → Inbox IA",
+    "name": "Automatic Watch - AI Inbox",
+    "description": "Reads configured RSS feeds, ranks recent items, summarizes selected sources, and adds them to the AI Inbox.",
     "active": true,
+    "isArchived": false,
     "nodes": [
       {
         "id": "11a0bff3-6171-4af0-948d-27f106bab601",
-        "name": "Tous les jours 6h10",
+        "name": "Every day at 6:10",
         "type": "n8n-nodes-base.scheduleTrigger",
         "typeVersion": 1.2,
-        "position": [160, 240],
+        "position": [
+          160,
+          240
+        ],
         "parameters": {
           "rule": {
             "interval": [
@@ -23,10 +28,13 @@
       },
       {
         "id": "92fe8a24-764a-4429-8046-370444a3ef02",
-        "name": "Inbox IA — URLs existantes",
+        "name": "AI Inbox - existing URLs",
         "type": "n8n-nodes-base.notion",
         "typeVersion": 2.2,
-        "position": [400, 240],
+        "position": [
+          400,
+          240
+        ],
         "parameters": {
           "resource": "databasePage",
           "operation": "getAll",
@@ -34,7 +42,7 @@
             "__rl": true,
             "value": "={{ $env.NOTION_INBOX_DATABASE_ID }}",
             "mode": "id",
-            "cachedResultName": "Inbox IA"
+            "cachedResultName": "AI Inbox"
           },
           "returnAll": true,
           "options": {}
@@ -42,7 +50,7 @@
         "credentials": {
           "notionApi": {
             "id": "__NOTION_CREDENTIAL_ID__",
-            "name": "Notion API"
+            "name": "Notion account"
           }
         },
         "alwaysOutputData": true,
@@ -51,21 +59,27 @@
       },
       {
         "id": "1a998ac5-b58b-4ec9-8538-b2f819aeb503",
-        "name": "Sources RSS",
+        "name": "RSS sources",
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
-        "position": [640, 240],
+        "position": [
+          640,
+          240
+        ],
         "parameters": {
           "mode": "runOnceForAllItems",
-          "jsCode": "const feeds = ($env.WATCH_RSS_FEEDS || '').split(',').map(s => s.trim()).filter(Boolean);\nif (!feeds.length) throw new Error('WATCH_RSS_FEEDS is empty');\nconst notionItems = $('Inbox IA — URLs existantes').all();\nif (notionItems.some(i => i.json && i.json.error)) throw new Error('Unable to read existing Inbox URLs from Notion');\nreturn feeds.map(feed_url => ({ json: { feed_url } }));"
+          "jsCode": "const feeds = ($env.WATCH_RSS_FEEDS || '').split(',').map(s => s.trim()).filter(Boolean);\nif (!feeds.length) throw new Error('WATCH_RSS_FEEDS is empty');\nconst notionItems = $('AI Inbox - existing URLs').all();\nif (notionItems.some(i => i.json && i.json.error)) throw new Error('Unable to read existing Inbox URLs from Notion');\nreturn feeds.map(feed_url => ({ json: { feed_url } }));"
         }
       },
       {
         "id": "6457c4fa-dbc7-445d-ad23-c2820e055704",
-        "name": "Lire les flux RSS",
+        "name": "Read RSS feeds",
         "type": "n8n-nodes-base.rssFeedRead",
         "typeVersion": 1.2,
-        "position": [880, 240],
+        "position": [
+          880,
+          240
+        ],
         "parameters": {
           "url": "={{ $json.feed_url }}",
           "options": {
@@ -76,24 +90,30 @@
       },
       {
         "id": "61e92f4b-cdd2-4fa4-9ef2-d0d4d9b7c905",
-        "name": "Filtrer et classer",
+        "name": "Filter and rank",
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
-        "position": [1120, 240],
+        "position": [
+          1120,
+          240
+        ],
         "parameters": {
           "mode": "runOnceForAllItems",
-          "jsCode": "const MAX_ITEMS = Number($env.WATCH_MAX_ITEMS || 4);\nconst MAX_PER_HOST = Number($env.WATCH_MAX_PER_HOST || 2);\nconst MAX_AGE_HOURS = Number($env.WATCH_MAX_AGE_HOURS || 72);\nconst now = Date.now();\n\nconst textOf = (v) => {\n  if (v == null) return '';\n  if (Array.isArray(v)) return v.map(textOf).filter(Boolean).join(' ');\n  if (typeof v === 'object') return v.plain_text || v.name || v.value || v.url || '';\n  return String(v);\n};\nconst normalizeUrl = (raw) => {\n  let value = textOf(raw).trim().split('#')[0];\n  if (!/^https?:\\/\\//i.test(value)) return '';\n  value = value.replace(/([?&])(utm_[^=&]+|ref|source)=[^&]*/gi, '$1').replace(/[?&]+$/, '');\n  return value.replace(/\\\/$/, '');\n};\nconst hostOf = (url) => ((url.match(/^https?:\\/\\/([^/]+)/i) || [])[1] || '').replace(/^www\\./, '');\nconst existing = new Set();\nfor (const item of $('Inbox IA — URLs existantes').all()) {\n  const j = item.json || {}; const p = j.properties || {}; const src = { ...p, ...j };\n  for (const key of ['property_url', 'URL', 'url']) { const value = normalizeUrl(textOf(src[key])); if (value) existing.add(value); }\n}\nconst keywords = ($env.WATCH_KEYWORDS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);\nif (!keywords.length) throw new Error('WATCH_KEYWORDS is empty');\nconst candidates = [];\nfor (const item of $input.all()) {\n  const j = item.json || {};\n  const url = normalizeUrl(j.link || j.guid || '');\n  const title = textOf(j.title).trim();\n  if (!url || !title || existing.has(url) || j.error) continue;\n  const publishedRaw = j.isoDate || j.pubDate || j.published || j.updated;\n  const publishedAt = publishedRaw ? new Date(publishedRaw).getTime() : NaN;\n  if (!Number.isFinite(publishedAt) || publishedAt > now + 3600000 || now - publishedAt > MAX_AGE_HOURS * 3600000) continue;\n  const excerpt = textOf(j.contentSnippet || j.content || j.summary || j.description).replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, 1400);\n  const haystack = (title + ' ' + excerpt).toLowerCase();\n  let score = 0; const reasons = [];\n  for (const term of keywords) {\n    if (haystack.includes(term)) { score += term.includes(' ') ? 3 : 2; reasons.push(term); }\n  }\n  if (score < 2) continue;\n  candidates.push({ url, title, excerpt, published_at: new Date(publishedAt).toISOString(), score, reasons: [...new Set(reasons)].slice(0, 4), host: hostOf(url) });\n}\nconst counts = {}; const selected = [];\nfor (const c of candidates.sort((a, b) => b.score - a.score || new Date(b.published_at) - new Date(a.published_at))) {\n  if ((counts[c.host] || 0) >= MAX_PER_HOST) continue;\n  counts[c.host] = (counts[c.host] || 0) + 1; selected.push(c);\n  if (selected.length >= MAX_ITEMS) break;\n}\nreturn selected.map(c => ({ json: c }));"
+          "jsCode": "const MAX_ITEMS = Number($env.WATCH_MAX_ITEMS || 4);\nconst MAX_PER_HOST = Number($env.WATCH_MAX_PER_HOST || 2);\nconst MAX_AGE_HOURS = Number($env.WATCH_MAX_AGE_HOURS || 72);\nconst now = Date.now();\n\nconst textOf = (v) => {\n  if (v == null) return '';\n  if (Array.isArray(v)) return v.map(textOf).filter(Boolean).join(' ');\n  if (typeof v === 'object') return v.plain_text || v.name || v.value || v.url || '';\n  return String(v);\n};\nconst normalizeUrl = (raw) => {\n  let value = textOf(raw).trim().split('#')[0];\n  if (!/^https?:\\/\\//i.test(value)) return '';\n  value = value.replace(/([?&])(utm_[^=&]+|ref|source)=[^&]*/gi, '$1').replace(/[?&]+$/, '');\n  return value.replace(/\\/$/, '');\n};\nconst hostOf = (url) => ((url.match(/^https?:\\/\\/([^/]+)/i) || [])[1] || '').replace(/^www\\./, '');\nconst existing = new Set();\nfor (const item of $('AI Inbox - existing URLs').all()) {\n  const j = item.json || {}; const p = j.properties || {}; const src = { ...p, ...j };\n  for (const key of ['property_url', 'URL', 'url']) { const value = normalizeUrl(textOf(src[key])); if (value) existing.add(value); }\n}\nconst keywords = ($env.WATCH_KEYWORDS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);\nif (!keywords.length) throw new Error('WATCH_KEYWORDS is empty');\nconst candidates = [];\nfor (const item of $input.all()) {\n  const j = item.json || {};\n  const url = normalizeUrl(j.link || j.guid || '');\n  const title = textOf(j.title).trim();\n  if (!url || !title || existing.has(url) || j.error) continue;\n  const publishedRaw = j.isoDate || j.pubDate || j.published || j.updated;\n  const publishedAt = publishedRaw ? new Date(publishedRaw).getTime() : NaN;\n  if (!Number.isFinite(publishedAt) || publishedAt > now + 3600000 || now - publishedAt > MAX_AGE_HOURS * 3600000) continue;\n  const excerpt = textOf(j.contentSnippet || j.content || j.summary || j.description).replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, 1400);\n  const haystack = (title + ' ' + excerpt).toLowerCase();\n  let score = 0; const reasons = [];\n  for (const term of keywords) {\n    if (haystack.includes(term)) { score += term.includes(' ') ? 3 : 2; reasons.push(term); }\n  }\n  if (score < 2) continue;\n  candidates.push({ url, title, excerpt, published_at: new Date(publishedAt).toISOString(), score, reasons: [...new Set(reasons)].slice(0, 4), host: hostOf(url) });\n}\nconst counts = {}; const selected = [];\nfor (const c of candidates.sort((a, b) => b.score - a.score || new Date(b.published_at) - new Date(a.published_at))) {\n  if ((counts[c.host] || 0) >= MAX_PER_HOST) continue;\n  counts[c.host] = (counts[c.host] || 0) + 1; selected.push(c);\n  if (selected.length >= MAX_ITEMS) break;\n}\nreturn selected.map(c => ({ json: c }));"
         }
       },
       {
         "id": "e5d98a13-823d-483a-9eed-ab02f18d1106",
-        "name": "Memo Bridge — résumer",
+        "name": "Memo Bridge - summarize",
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
-        "position": [1360, 240],
+        "position": [
+          1360,
+          240
+        ],
         "parameters": {
           "method": "POST",
-        "url": "={{ $env.MEMO_BRIDGE_URL + '/summarize' }}",
+          "url": "={{ $env.MEMO_BRIDGE_URL + '/summarize' }}",
           "sendHeaders": true,
           "headerParameters": {
             "parameters": [
@@ -113,10 +133,13 @@
       },
       {
         "id": "24ebc062-0d24-499b-a6dd-43cd50ae0f07",
-        "name": "Notion — ajouter à Inbox IA",
+        "name": "Notion - add to AI Inbox",
         "type": "n8n-nodes-base.notion",
         "typeVersion": 2.2,
-        "position": [1600, 240],
+        "position": [
+          1600,
+          240
+        ],
         "parameters": {
           "resource": "databasePage",
           "operation": "create",
@@ -124,22 +147,55 @@
             "__rl": true,
             "value": "={{ $env.NOTION_INBOX_DATABASE_ID }}",
             "mode": "id",
-            "cachedResultName": "Inbox IA"
+            "cachedResultName": "AI Inbox"
           },
           "title": "={{ $json.title }}",
           "propertiesUi": {
             "propertyValues": [
-              { "key": "Source|select", "selectValue": "={{ $json.source }}" },
-              { "key": "URL|url", "urlValue": "={{ $json.url }}" },
-              { "key": "Summary|rich_text", "textContent": "={{ $json.summary }}" },
-              { "key": "Insight|rich_text", "textContent": "={{ $json.insight }}" },
-              { "key": "Next Action|rich_text", "textContent": "={{ $json.next_action }}" },
-              { "key": "Area|select", "selectValue": "={{ $json.area }}" },
-              { "key": "Tags|multi_select", "multiSelectValue": "={{ $json.tags }}" },
-              { "key": "Importance|number", "numberValue": "={{ $json.importance }}" },
-              { "key": "Raw Content|rich_text", "textContent": "={{ $json.text }}" },
-              { "key": "Captured At|date", "date": "={{ $json.captured_at }}" },
-              { "key": "Status|select", "selectValue": "Inbox" }
+              {
+                "key": "Source|select",
+                "selectValue": "={{ $json.source }}"
+              },
+              {
+                "key": "URL|url",
+                "urlValue": "={{ $json.url }}"
+              },
+              {
+                "key": "Summary|rich_text",
+                "textContent": "={{ $json.summary }}"
+              },
+              {
+                "key": "Insight|rich_text",
+                "textContent": "={{ $json.insight }}"
+              },
+              {
+                "key": "Next Action|rich_text",
+                "textContent": "={{ $json.next_action }}"
+              },
+              {
+                "key": "Area|select",
+                "selectValue": "={{ $json.area }}"
+              },
+              {
+                "key": "Tags|multi_select",
+                "multiSelectValue": "={{ $json.tags }}"
+              },
+              {
+                "key": "Importance|number",
+                "numberValue": "={{ $json.importance }}"
+              },
+              {
+                "key": "Raw Content|rich_text",
+                "textContent": "={{ $json.text }}"
+              },
+              {
+                "key": "Captured At|date",
+                "date": "={{ $json.captured_at }}"
+              },
+              {
+                "key": "Status|select",
+                "selectValue": "Inbox"
+              }
             ]
           },
           "options": {}
@@ -147,18 +203,78 @@
         "credentials": {
           "notionApi": {
             "id": "__NOTION_CREDENTIAL_ID__",
-            "name": "Notion API"
+            "name": "Notion account"
           }
         }
       }
     ],
     "connections": {
-      "Tous les jours 6h10": { "main": [[{ "node": "Inbox IA — URLs existantes", "type": "main", "index": 0 }]] },
-      "Inbox IA — URLs existantes": { "main": [[{ "node": "Sources RSS", "type": "main", "index": 0 }]] },
-      "Sources RSS": { "main": [[{ "node": "Lire les flux RSS", "type": "main", "index": 0 }]] },
-      "Lire les flux RSS": { "main": [[{ "node": "Filtrer et classer", "type": "main", "index": 0 }]] },
-      "Filtrer et classer": { "main": [[{ "node": "Memo Bridge — résumer", "type": "main", "index": 0 }]] },
-      "Memo Bridge — résumer": { "main": [[{ "node": "Notion — ajouter à Inbox IA", "type": "main", "index": 0 }]] }
+      "Every day at 6:10": {
+        "main": [
+          [
+            {
+              "node": "AI Inbox - existing URLs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Inbox - existing URLs": {
+        "main": [
+          [
+            {
+              "node": "RSS sources",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "RSS sources": {
+        "main": [
+          [
+            {
+              "node": "Read RSS feeds",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read RSS feeds": {
+        "main": [
+          [
+            {
+              "node": "Filter and rank",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter and rank": {
+        "main": [
+          [
+            {
+              "node": "Memo Bridge - summarize",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Memo Bridge - summarize": {
+        "main": [
+          [
+            {
+              "node": "Notion - add to AI Inbox",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
     },
     "settings": {
       "executionOrder": "v1",
@@ -168,7 +284,19 @@
       "callerPolicy": "workflowsFromSameOwner",
       "errorWorkflow": "globalErrorMonitor"
     },
+    "staticData": {
+      "node:Every day at 6:10": {
+        "recurrenceRules": []
+      }
+    },
+    "meta": null,
+    "nodeGroups": [],
     "pinData": {},
+    "versionId": "9bc65770-4cee-49a4-8959-40e874e9bb80",
+    "activeVersionId": "9bc65770-4cee-49a4-8959-40e874e9bb80",
+    "versionCounter": 6,
+    "triggerCount": 1,
+    "sourceWorkflowId": null,
     "tags": []
   }
 ]
