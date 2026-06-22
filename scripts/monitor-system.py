@@ -99,15 +99,29 @@ def telegram(env, message):
         return False
 
 
+def tunnel_enabled(env):
+    """True only when the Cloudflare tunnel is part of this access mode. LAN/VPN modes
+    never start the cloudflared container, so checking it there is a permanent false alarm."""
+    profiles = [p.strip() for p in env.get("COMPOSE_PROFILES", "").split(",")]
+    return "tunnel" in profiles or env.get("ACCESS_MODE", "").strip() == "tunnel"
+
+
+def active_checks(env):
+    """The watchdog checks to run for this access mode, as name -> callable."""
+    checks = {
+        "n8n": lambda: container_ok("n8n", require_health=True),
+        "memo-bridge": lambda: bridge_ok(env.get("MEMO_PORT", "8088")),
+        "public-tunnel": lambda: public_ok(env.get("N8N_PUBLIC_URL", "")),
+        "daily-brief": lambda: brief_ok(env.get("BRIEF_EXPECTED_BY", "08:15")),
+    }
+    if tunnel_enabled(env):
+        checks["cloudflared"] = lambda: container_ok("cloudflared")
+    return checks
+
+
 def main():
     env = load_env()
-    checks = {
-        "n8n": container_ok("n8n", require_health=True),
-        "cloudflared": container_ok("cloudflared"),
-        "memo-bridge": bridge_ok(env.get("MEMO_PORT", "8088")),
-        "public-tunnel": public_ok(env.get("N8N_PUBLIC_URL", "")),
-        "daily-brief": brief_ok(env.get("BRIEF_EXPECTED_BY", "08:15")),
-    }
+    checks = {name: run() for name, run in active_checks(env).items()}
     STATE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     try:
         previous = json.loads(STATE_FILE.read_text(encoding="utf-8"))
