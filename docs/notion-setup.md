@@ -7,11 +7,9 @@ integration**, and their IDs copied into `.env`.
 
 ## Option A — duplicate the template (recommended)
 
-1. Open the template: `TODO: <public Notion template URL>` and click **Duplicate**.
+1. Open the [Second Brain template](https://app.notion.com/p/Second-Brain-Template-387d8df51dea813292a9c3f1af754fbe) and click **Duplicate**.
 2. Share each duplicated database/page with your integration (see "Sharing" below).
 3. Copy each ID into `.env` (see "IDs" below).
-
-> The template URL is a placeholder until published. Until then, use Option B.
 
 ## Option B — recreate the schema by hand
 
@@ -74,6 +72,7 @@ The brief proposes 1–3 tasks/day here; still-open and recently-completed tasks
 | Page             | `.env` variable             | Role                                                                 |
 |------------------|-----------------------------|----------------------------------------------------------------------|
 | Daily Brief      | `NOTION_DAILY_BRIEF_PAGE_ID`| Brief output. Keep a permanent first block as a header — new briefs are inserted right after it (most recent on top). |
+| Weekly Reviews   | `NOTION_WEEKLY_REVIEWS_PAGE_ID` | Weekly output. Keep a permanent first block as a header; the newest review is inserted after it. |
 | Notes            | `NOTION_NOTES_PAGE_ID`      | Journal. Recognized `heading_2`/`heading_1` sections: `Today`, `Journal`, and `Todo`/`✅`. The Daily Brief moves `Today` under yesterday's Journal date, then clears it. An `Archive`/`🗄` heading ends parsing. |
 | System Context   | `NOTION_CONTEXT_PAGE_ID`    | Free text read each morning as the brief's system context (who you are, projects, priorities, copilot rules). No personal data lives in the code. |
 
@@ -83,6 +82,11 @@ the task is reopened or abandoned, and sets a fresh completion date if it is com
 The Notes rollover runs only when a new Daily Brief is due. It writes a `Daily notes` marker under
 yesterday's Journal date before clearing `Today`; retries detect that marker and never duplicate the
 archived notes.
+
+Weekly Review runs every Sunday at 19:00 using the instance timezone. Its dedicated destination
+prevents weekly content from changing the Daily Brief insertion anchor. The optional
+`NOTION_LIBRARY_DATABASE_ID` may point to a shared Readwise or other Library database; leave it
+empty to omit that source.
 
 ## Sharing
 
@@ -98,10 +102,12 @@ Copy the ID from each Notion URL into `.env`. The ID is the 32-character hex str
 ```
 NOTION_INBOX_DATABASE_ID=
 NOTION_DAILY_BRIEF_PAGE_ID=
+NOTION_WEEKLY_REVIEWS_PAGE_ID=
 NOTION_NOTES_PAGE_ID=
 NOTION_CONTEXT_PAGE_ID=
 NOTION_OBJECTIVES_DATABASE_ID=
 NOTION_TASKS_DATABASE_ID=
+NOTION_LIBRARY_DATABASE_ID=  # optional
 N8N_NOTION_CREDENTIAL_ID=   # the id of the Notion credential you create inside n8n
 ```
 

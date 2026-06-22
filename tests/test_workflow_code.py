@@ -9,12 +9,13 @@ ROOT = pathlib.Path(__file__).parents[1]
 RUNNER = ROOT / "tests" / "run_workflow_code.js"
 
 
-def run_code(workflow, node, *, inputs=None, nodes=None):
+def run_code(workflow, node, *, inputs=None, nodes=None, env=None):
     request = {
         "workflow": str(ROOT / "workflows" / workflow),
         "node": node,
         "input": inputs or [],
         "nodes": nodes or {},
+        "env": env or {},
     }
     completed = subprocess.run(
         ["node", str(RUNNER)],
@@ -235,6 +236,77 @@ class TaskLifecycleCodeTests(unittest.TestCase):
         self.assertEqual([item["json"]["action"] for item in result], ["set", "clear"])
         self.assertIsNotNone(result[0]["json"]["body"]["properties"]["Done on"]["date"])
         self.assertIsNone(result[1]["json"]["body"]["properties"]["Done on"]["date"])
+
+
+class WeeklyReviewCodeTests(unittest.TestCase):
+    def test_existing_week_stops_before_notion_reads(self):
+        today = datetime.datetime.now()
+        start = today - datetime.timedelta(days=today.weekday())
+        heading = {
+            "type": "heading_2",
+            "heading_2": {"rich_text": [{"plain_text": (
+                f"Weekly Review — {start.strftime('%d/%m/%Y')} "
+                f"to {today.strftime('%d/%m/%Y')}"
+            )}]},
+        }
+
+        result = run_code(
+            "weekly-review.workflow.json",
+            "Prepare review period",
+            inputs=[heading],
+        )
+
+        self.assertEqual(result, [])
+
+    def test_assemble_evidence_uses_done_on_as_completion_proof(self):
+        today = datetime.datetime.now()
+        monday = today - datetime.timedelta(days=today.weekday())
+        period = {
+            "week_start": monday.strftime("%d/%m/%Y"),
+            "week_end": today.strftime("%d/%m/%Y"),
+            "start_iso": monday.strftime("%Y-%m-%d"),
+            "end_iso": today.strftime("%Y-%m-%d"),
+        }
+        nodes = {
+            "Prepare review period": [period],
+            "System context": [{
+                "type": "paragraph",
+                "paragraph": {"rich_text": [{"plain_text": "Prioritize evidence."}]},
+            }],
+            "Notes": [],
+            "Objectives": [{
+                "property_name": "Ship a reliable system",
+                "property_status": "Active",
+                "property_current_state": "Weekly review is missing",
+            }],
+            "Tasks": [
+                {
+                    "property_task": "Add the weekly workflow",
+                    "property_status": "Done",
+                    "property_done_on": {"start": today.strftime("%Y-%m-%d")},
+                },
+                {
+                    "property_task": "Old completed task",
+                    "property_status": "Done",
+                    "property_done_on": {
+                        "start": (monday - datetime.timedelta(days=2)).strftime("%Y-%m-%d")
+                    },
+                },
+            ],
+            "Daily Briefs": [],
+        }
+
+        result = run_code(
+            "weekly-review.workflow.json",
+            "Assemble evidence",
+            nodes=nodes,
+            env={"WEEKLY_LANGUAGE": "French", "NOTION_LIBRARY_DATABASE_ID": ""},
+        )[0]["json"]
+
+        self.assertEqual(result["language"], "French")
+        self.assertEqual([task["title"] for task in result["tasks"]], ["Add the weekly workflow"])
+        self.assertEqual(result["objectives"][0]["name"], "Ship a reliable system")
+        self.assertIn("Prioritize evidence.", result["system_context"])
 
 
 if __name__ == "__main__":

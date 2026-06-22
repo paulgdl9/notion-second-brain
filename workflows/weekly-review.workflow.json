@@ -1,0 +1,618 @@
+[
+  {
+    "id": "weeklyReviewNotion",
+    "name": "Weekly Review",
+    "description": "Builds an evidence-based weekly review from Notion every Sunday evening.",
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "id": "weekly-manual",
+        "name": "Run manually",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          400
+        ],
+        "parameters": {}
+      },
+      {
+        "id": "weekly-schedule",
+        "name": "Every Sunday at 19:00",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          240
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 19 * * 0"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "weekly-existing",
+        "name": "Existing reviews",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          220,
+          240
+        ],
+        "alwaysOutputData": true,
+        "parameters": {
+          "resource": "block",
+          "operation": "getAll",
+          "blockId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_WEEKLY_REVIEWS_PAGE_ID }}",
+            "mode": "id"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion account"
+          }
+        }
+      },
+      {
+        "id": "weekly-period",
+        "name": "Prepare review period",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          440,
+          240
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "const now = new Date();\nconst end = new Date(now.getFullYear(), now.getMonth(), now.getDate());\nconst start = new Date(end);\nconst day = start.getDay();\nstart.setDate(start.getDate() - (day === 0 ? 6 : day - 1));\nconst iso = date => {\n  const year = date.getFullYear();\n  const month = String(date.getMonth() + 1).padStart(2, '0');\n  const dayOfMonth = String(date.getDate()).padStart(2, '0');\n  return `${year}-${month}-${dayOfMonth}`;\n};\nconst display = date => date.toLocaleDateString('en-GB');\nconst getText = block => {\n  const content = block && block[block.type];\n  return content ? (content.rich_text || []).map(text => text.plain_text || '').join('') : '';\n};\nconst weekStart = display(start);\nconst weekEnd = display(end);\nconst exists = $input.all().some(item => {\n  const block = item.json || {};\n  if (block.type !== 'heading_1' && block.type !== 'heading_2') return false;\n  const text = getText(block);\n  return text.includes('Weekly Review') && text.includes(weekStart) && text.includes(weekEnd);\n});\nif (exists) return [];\nreturn [{ json: { week_start: weekStart, week_end: weekEnd, start_iso: iso(start), end_iso: iso(end) } }];\n"
+        }
+      },
+      {
+        "id": "weekly-context",
+        "name": "System context",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          660,
+          240
+        ],
+        "alwaysOutputData": true,
+        "parameters": {
+          "resource": "block",
+          "operation": "getAll",
+          "blockId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_CONTEXT_PAGE_ID }}",
+            "mode": "id"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion account"
+          }
+        }
+      },
+      {
+        "id": "weekly-notes",
+        "name": "Notes",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          880,
+          240
+        ],
+        "alwaysOutputData": true,
+        "parameters": {
+          "resource": "block",
+          "operation": "getAll",
+          "blockId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_NOTES_PAGE_ID }}",
+            "mode": "id"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion account"
+          }
+        }
+      },
+      {
+        "id": "weekly-objectives",
+        "name": "Objectives",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          1100,
+          240
+        ],
+        "alwaysOutputData": true,
+        "parameters": {
+          "resource": "databasePage",
+          "operation": "getAll",
+          "databaseId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_OBJECTIVES_DATABASE_ID }}",
+            "mode": "id",
+            "cachedResultName": "Objectives"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion account"
+          }
+        }
+      },
+      {
+        "id": "weekly-tasks",
+        "name": "Tasks",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          1320,
+          240
+        ],
+        "alwaysOutputData": true,
+        "parameters": {
+          "resource": "databasePage",
+          "operation": "getAll",
+          "databaseId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_TASKS_DATABASE_ID }}",
+            "mode": "id",
+            "cachedResultName": "Tasks"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion account"
+          }
+        }
+      },
+      {
+        "id": "weekly-briefs",
+        "name": "Daily Briefs",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          1540,
+          240
+        ],
+        "alwaysOutputData": true,
+        "parameters": {
+          "resource": "block",
+          "operation": "getAll",
+          "blockId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_DAILY_BRIEF_PAGE_ID }}",
+            "mode": "id"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion account"
+          }
+        }
+      },
+      {
+        "id": "weekly-library-check",
+        "name": "Library configured?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          1760,
+          240
+        ],
+        "parameters": {
+          "conditions": {
+            "combinator": "and",
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "weekly-library-present",
+                "leftValue": "={{ $env.NOTION_LIBRARY_DATABASE_ID || '' }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty",
+                  "singleValue": true
+                }
+              }
+            ]
+          },
+          "options": {
+            "ignoreCase": false,
+            "looseTypeValidation": false
+          }
+        }
+      },
+      {
+        "id": "weekly-library",
+        "name": "Library",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          1980,
+          140
+        ],
+        "alwaysOutputData": true,
+        "parameters": {
+          "resource": "databasePage",
+          "operation": "getAll",
+          "databaseId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_LIBRARY_DATABASE_ID }}",
+            "mode": "id",
+            "cachedResultName": "Library"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion account"
+          }
+        }
+      },
+      {
+        "id": "weekly-assemble",
+        "name": "Assemble evidence",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2200,
+          240
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "const period = $('Prepare review period').first().json || {};\nconst start = new Date(period.start_iso + 'T00:00:00');\nconst end = new Date(period.end_iso + 'T23:59:59.999');\nconst inPeriod = value => {\n  if (!value) return false;\n  const date = new Date(value);\n  return Number.isFinite(date.getTime()) && date >= start && date <= end;\n};\nconst getText = block => {\n  if (typeof block.content === 'string') return block.content;\n  const content = block[block.type];\n  return content ? (content.rich_text || []).map(text => text.plain_text || '').join('') : '';\n};\nconst normalize = value => (value || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '');\nconst toText = value => {\n  if (value === undefined || value === null) return '';\n  if (Array.isArray(value)) return value.map(toText).filter(Boolean).join(', ');\n  if (typeof value === 'object') return value.name || value.value || value.plain_text || value.start || (value.text && value.text.content) || '';\n  return value.toString();\n};\nconst mapped = json => {\n  const result = {};\n  const source = { ...(json.properties || {}), ...json };\n  for (const key of Object.keys(source)) result[normalize(key.startsWith('property_') ? key.slice(9) : key)] = source[key];\n  return result;\n};\nconst field = (properties, names) => {\n  for (const name of names) { const value = toText(properties[name]); if (value) return value; }\n  return '';\n};\nconst nodeItems = name => {\n  const items = $(name).all();\n  if (items.some(item => item.json && item.json.error)) throw new Error('Notion read failed: ' + name);\n  return items.map(item => item.json || {});\n};\n\nconst contextLines = [];\nfor (const block of nodeItems('System context')) {\n  const text = getText(block).trim();\n  if (text) contextLines.push(block.type && block.type.startsWith('heading_') ? '## ' + text : '- ' + text);\n}\nconst system_context = contextLines.join('\\n').slice(0, 16000);\nif (!system_context) throw new Error('System Context is empty');\n\nconst journal = [];\nconst todos = [];\nlet section = '';\nlet journalDate = '';\nfor (const block of nodeItems('Notes')) {\n  const text = getText(block).trim();\n  if (block.type === 'heading_1' || block.type === 'heading_2') {\n    if (text.includes('Journal')) section = 'journal';\n    else if (text.includes('Todo') || text.includes('✅')) section = 'todos';\n    else if (text.includes('Archive') || text.includes('🗄')) break;\n    else section = '';\n    continue;\n  }\n  if (section === 'journal' && block.type === 'heading_3') {\n    const match = text.match(/(\\d{2})\\/(\\d{2})\\/(\\d{4})/);\n    journalDate = match ? `${match[3]}-${match[2]}-${match[1]}` : '';\n    continue;\n  }\n  if (!text) continue;\n  if (section === 'journal' && inPeriod(journalDate)) journal.push({ date: journalDate, text });\n  if (section === 'todos') todos.push({ text, checked: Boolean(block.checked ?? ((block.to_do || {}).checked)) });\n}\n\nconst objectives = [];\nfor (const row of nodeItems('Objectives')) {\n  const p = mapped(row);\n  const name = field(p, ['name']);\n  if (!name) continue;\n  objectives.push({ name, status: field(p, ['status']), area: field(p, ['area']), priority: field(p, ['priority']), current_state: field(p, ['currentstate']), next_step: field(p, ['nextstep']), horizon: field(p, ['horizon']) });\n}\n\nconst tasks = [];\nfor (const row of nodeItems('Tasks')) {\n  const p = mapped(row);\n  const title = field(p, ['task']);\n  if (!title) continue;\n  const status = field(p, ['status']);\n  const proposed_on = field(p, ['proposedon']);\n  const done_on = field(p, ['doneon']);\n  if (status === 'Done' && !inPeriod(done_on)) continue;\n  if (status === 'Abandoned' && !inPeriod(proposed_on) && !inPeriod(field(p, ['lasteditedtime']))) continue;\n  tasks.push({ title, status, area: field(p, ['area']), why: field(p, ['why']), feedback: field(p, ['feedback']), proposed_on, done_on });\n}\n\nconst daily_briefs = [];\nlet current = null;\nfor (const block of nodeItems('Daily Briefs')) {\n  const text = getText(block).trim();\n  if (block.type === 'heading_2') {\n    const match = text.match(/Daily Brief[^0-9]*(\\d{2})\\/(\\d{2})\\/(\\d{4})/i);\n    const isoDate = match ? `${match[3]}-${match[2]}-${match[1]}` : '';\n    current = inPeriod(isoDate) ? { date: isoDate, content: [] } : null;\n    if (current) daily_briefs.push(current);\n    continue;\n  }\n  if (current && text) current.content.push(text);\n}\n\nconst library = [];\nconst libraryRows = $env.NOTION_LIBRARY_DATABASE_ID ? nodeItems('Library') : [];\nfor (const row of libraryRows) {\n  const p = mapped(row);\n  const title = field(p, ['name', 'title']);\n  const date = field(p, ['publishedat', 'capturedat', 'createdtime', 'lasteditedtime']);\n  if (title && (!date || inPeriod(date))) library.push({ title, date, author: field(p, ['author']), category: field(p, ['category', 'type']), summary: field(p, ['summary', 'highlights']) });\n}\n\nreturn [{ json: { ...period, language: $env.WEEKLY_LANGUAGE || 'French', system_context, journal: journal.slice(0, 100), todos: todos.slice(0, 100), objectives: objectives.slice(0, 50), tasks: tasks.slice(0, 150), daily_briefs: daily_briefs.slice(0, 7), library: library.slice(0, 50) } }];\n"
+        }
+      },
+      {
+        "id": "weekly-generate",
+        "name": "Memo Bridge /weekly",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2420,
+          240
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "={{ $env.MEMO_BRIDGE_URL + '/weekly' }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "={{ 'Bearer ' + $env.MEMO_TOKEN }}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json) }}",
+          "options": {
+            "timeout": 230000
+          }
+        }
+      },
+      {
+        "id": "weekly-write-payload",
+        "name": "Build write payload",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2640,
+          240
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "const generated = $input.first().json || {};\nif (!Array.isArray(generated.blocks) || !generated.blocks.length) throw new Error('Weekly Review returned no Notion blocks');\nconst existing = $('Existing reviews').all().map(item => item.json || {}).filter(block => block.id);\nconst children = [{ object: 'block', type: 'divider', divider: {} }, ...generated.blocks];\nconst body = existing.length ? { children, after: existing[0].id } : { children };\nreturn [{ json: { body } }];\n"
+        }
+      },
+      {
+        "id": "weekly-write",
+        "name": "Write Weekly Review",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2860,
+          240
+        ],
+        "parameters": {
+          "method": "PATCH",
+          "url": "={{ 'https://api.notion.com/v1/blocks/' + $env.NOTION_WEEKLY_REVIEWS_PAGE_ID + '/children' }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "notionApi",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Notion-Version",
+                "value": "2022-06-28"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json.body) }}",
+          "options": {
+            "timeout": 15000
+          }
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion account"
+          }
+        }
+      },
+      {
+        "id": "weekly-degradation",
+        "name": "Detect degradation",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2640,
+          400
+        ],
+        "parameters": {
+          "jsCode": "const generated = $('Memo Bridge /weekly').first().json || {};\nif (generated.engine === 'claude' && generated.context_source === 'notion') return [];\nreturn [{ json: { engine: generated.engine || 'none', context_source: generated.context_source || 'missing', week_end: $('Prepare review period').first().json.week_end } }];\n"
+        }
+      },
+      {
+        "id": "weekly-alert",
+        "name": "Telegram alert",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2860,
+          400
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "={{ 'https://api.telegram.org/bot' + $env.TELEGRAM_BOT_TOKEN + '/sendMessage' }}",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: 'Weekly Review - degradation\\n\\nEngine: ' + $json.engine + '\\nContext: ' + $json.context_source + '\\nWeek ending: ' + $json.week_end }) }}",
+          "options": {
+            "timeout": 15000
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Every Sunday at 19:00": {
+        "main": [
+          [
+            {
+              "node": "Existing reviews",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Run manually": {
+        "main": [
+          [
+            {
+              "node": "Existing reviews",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Existing reviews": {
+        "main": [
+          [
+            {
+              "node": "Prepare review period",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare review period": {
+        "main": [
+          [
+            {
+              "node": "System context",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "System context": {
+        "main": [
+          [
+            {
+              "node": "Notes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Notes": {
+        "main": [
+          [
+            {
+              "node": "Objectives",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Objectives": {
+        "main": [
+          [
+            {
+              "node": "Tasks",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Tasks": {
+        "main": [
+          [
+            {
+              "node": "Daily Briefs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Daily Briefs": {
+        "main": [
+          [
+            {
+              "node": "Library configured?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Library configured?": {
+        "main": [
+          [
+            {
+              "node": "Library",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Assemble evidence",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Library": {
+        "main": [
+          [
+            {
+              "node": "Assemble evidence",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Assemble evidence": {
+        "main": [
+          [
+            {
+              "node": "Memo Bridge /weekly",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Memo Bridge /weekly": {
+        "main": [
+          [
+            {
+              "node": "Build write payload",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Detect degradation",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build write payload": {
+        "main": [
+          [
+            {
+              "node": "Write Weekly Review",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Detect degradation": {
+        "main": [
+          [
+            {
+              "node": "Telegram alert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "availableInMCP": false,
+      "callerPolicy": "workflowsFromSameOwner",
+      "errorWorkflow": "globalErrorMonitor"
+    },
+    "staticData": {
+      "node:Every Sunday at 19:00": {
+        "recurrenceRules": []
+      }
+    },
+    "meta": null,
+    "nodeGroups": [],
+    "pinData": {},
+    "versionId": "c277d3f1-70b0-436e-93c9-4991261b2965",
+    "activeVersionId": "c277d3f1-70b0-436e-93c9-4991261b2965",
+    "versionCounter": 1,
+    "triggerCount": 1,
+    "sourceWorkflowId": null,
+    "tags": []
+  }
+]

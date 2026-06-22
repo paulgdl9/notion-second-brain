@@ -103,7 +103,8 @@ window before the lifecycle workflow runs.
 - `docker-compose.yml`: n8n and the optional Cloudflare Tunnel.
 - `.env.example`: safe template for runtime variables.
 - `<repo>/.env`: real secrets and configuration; never commit it.
-- `bridge/memo-bridge.py`: local `/summarize`, `/brief`, and heartbeat API.
+- `bridge/memo-bridge.py`: local `/summarize`, `/brief`, `/weekly`, and heartbeat API.
+- `prompts/weekly-review.md`: generic, versioned Weekly Review instructions.
 - `bridge/memo-summarize`: Claude CLI wrapper for `/summarize`.
 - `bridge/memo.sh`: command-line capture helper.
 - `systemd/*.service.in`: service templates rendered by `install.sh`.
@@ -126,6 +127,7 @@ Internal bearer token between n8n and `memo-bridge`. It protects:
 
 - `POST /summarize`
 - `POST /brief`
+- `POST /weekly`
 - `POST /heartbeat/brief`
 - `POST /heartbeat/capture`
 
@@ -242,11 +244,13 @@ Every resource must be explicitly shared with the Notion integration configured 
 | Resource | Variable | Purpose |
 |----------|----------|---------|
 | Daily Brief | `NOTION_DAILY_BRIEF_PAGE_ID` | brief destination |
+| Weekly Reviews | `NOTION_WEEKLY_REVIEWS_PAGE_ID` | weekly review destination |
 | Notes | `NOTION_NOTES_PAGE_ID` | recent journal and todos |
 | Objectives | `NOTION_OBJECTIVES_DATABASE_ID` | active objectives |
 | Tasks | `NOTION_TASKS_DATABASE_ID` | task feedback loop |
 | System Context | `NOTION_CONTEXT_PAGE_ID` | profile, priorities, and rules |
 | AI Inbox | `NOTION_INBOX_DATABASE_ID` | manual and automatic captures |
+| Library (optional) | `NOTION_LIBRARY_DATABASE_ID` | weekly Readwise/library evidence |
 
 Resources created through another Notion integration still need to be shared with the n8n
 integration, otherwise Notion nodes return 404.
@@ -271,7 +275,19 @@ prompt. The response exposes `engine` and `context_source`:
 ```
 
 `/summarize` follows the same Claude-to-Codex chain, then preserves the capture through a local
-fallback. Both routes report `claude`, `codex`, or `none` in the `engine` field.
+fallback. Generation routes report `claude`, `codex`, or `none` in the `engine` field.
+
+## Weekly Review contract
+
+Every Sunday at 19:00, `Weekly Review` reads System Context, the week's Daily Briefs, dated Journal
+entries and todos, Objectives, Tasks, and the optional Library database. It calls `/weekly`, then
+inserts the result after the permanent first block of the dedicated Weekly Reviews page. A matching
+week heading stops a retry before any additional generation.
+
+The evidence contract is deliberately stricter than the Daily Brief: a task counts as execution
+only when `Status=Done` and `Done on` falls within the review period; Journal entries are evidence;
+Daily Briefs remain intentions. The model proposes exact objective edits but the workflow never
+changes Objectives, Notes, Tasks, or System Context. `WEEKLY_LANGUAGE` controls the output language.
 
 ## Daily Brief contract
 

@@ -55,6 +55,21 @@ class WorkflowContractTests(unittest.TestCase):
         for value in forbidden:
             self.assertNotIn(value, content)
 
+    def test_weekly_review_is_portable_and_scheduled(self):
+        path = WORKFLOW_DIR / "weekly-review.workflow.json"
+        workflow = json.loads(path.read_text(encoding="utf-8"))[0]
+        content = path.read_text(encoding="utf-8")
+        nodes = {node["name"]: node for node in workflow["nodes"]}
+
+        self.assertEqual(
+            nodes["Every Sunday at 19:00"]["parameters"]["rule"]["interval"][0]["expression"],
+            "0 19 * * 0",
+        )
+        self.assertIn("NOTION_WEEKLY_REVIEWS_PAGE_ID", content)
+        self.assertIn("$env.MEMO_BRIDGE_URL + '/weekly'", content)
+        self.assertIn("Run manually", nodes)
+        self.assertNotRegex(content, r"[0-9a-f]{32}")
+
 
 if __name__ == "__main__":
     unittest.main()

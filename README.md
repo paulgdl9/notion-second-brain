@@ -56,7 +56,8 @@ tunnel token. Secrets live only in `.env` (never committed); `.env.example` is t
   (mapped through `extra_hosts`), so no gateway IP is hard-coded.
 - `systemd/*.service.in` are templates rendered by `install.sh` for the current user/path
   (bridge + watchdog). Edit the templates, not the installed units under `/etc/systemd/system`.
-- `bridge/memo-bridge.py` exposes `/summarize` (Haiku → Codex) and `/brief` (Sonnet → Codex) for n8n.
+- `bridge/memo-bridge.py` exposes `/summarize` (Haiku → Codex), `/brief`, and `/weekly`
+  (Sonnet → Codex) for n8n.
 - `bridge/memo-summarize` is the Claude CLI wrapper used by `/summarize`.
 - `bridge/memo.sh` sends quick captures to the public n8n webhook.
 
@@ -68,6 +69,7 @@ tunnel token. Secrets live only in `.env` (never committed); `.env.example` is t
 | Daily Brief | Objective-driven daily synthesis |
 | Automatic Watch - AI Inbox | Configurable RSS watch |
 | Task Lifecycle (Done on) | Keeps task completion dates consistent |
+| Weekly Review | Evidence-based Sunday review and next-week focus |
 | Global Error Monitor | Failure alerts for every critical workflow |
 
 Daily Brief is an **objective-driven copilot**: it reads the Objectives database (the compass) plus
@@ -79,10 +81,17 @@ clears `Today` without duplicating content on retries.
 All personal context and behavioral rules come from the Notion page `System Context`. The bridge
 contains no personal fallback and refuses contextual generation when that page is unavailable.
 
+Weekly Review runs on Sunday at 19:00 and writes to its own Notion page. It treats `Done on` and
+dated Journal entries as execution evidence, treats Daily Briefs only as intentions, avoids counting
+the same signal twice, and proposes exact objective updates without applying them. Its public prompt
+is versioned in `prompts/weekly-review.md`; identity and priorities still come only from
+`System Context`. A Readwise or other Library database can be included through the optional
+`NOTION_LIBRARY_DATABASE_ID` variable.
+
 Automatic Watch runs before the Daily Brief. Feeds, keywords, age and volume limits are configured
 through `WATCH_*` variables in `.env`; no personal source or topic is embedded in the workflow.
 
-Both bridge routes use an LLM fallback: Claude → Codex CLI (OpenAI API key, no subscription
+The generation routes use an LLM fallback: Claude → Codex CLI (OpenAI API key, no subscription
 needed) → local fallback. Their responses include an `engine` field (`"claude"` / `"codex"` /
 `"none"`). A **Telegram alert** fires automatically for a degraded Daily Brief.
 

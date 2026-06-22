@@ -27,15 +27,17 @@ const $input = {
   all: () => inputItems,
   first: () => inputItems[0] || { json: {} },
 };
+const $env = request.env || {};
 
 const execute = new Function(
   '$input',
   '$',
   '$now',
+  '$env',
   `"use strict"; return (function () {\n${node.parameters.jsCode}\n})();`,
 );
 
-Promise.resolve(execute($input, accessor, request.now || new Date().toISOString()))
+Promise.resolve(execute($input, accessor, request.now || new Date().toISOString(), $env))
   .then(result => process.stdout.write(JSON.stringify(result === undefined ? null : result)))
   .catch(error => {
     process.stderr.write(`${error.stack || error}\n`);

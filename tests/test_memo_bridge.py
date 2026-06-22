@@ -43,6 +43,22 @@ class BriefPromptTests(unittest.TestCase):
         self.assertNotIn("Current situation from Notion", prompt)
 
 
+class WeeklyPromptTests(unittest.TestCase):
+    def test_weekly_prompt_is_generic_and_marks_briefs_as_intentions(self):
+        prompt = memo_bridge.build_weekly_prompt({
+            "week_start": "15/06/2026",
+            "week_end": "21/06/2026",
+            "language": "French",
+            "system_context": "Build a useful product.",
+            "tasks": [{"title": "Interview users", "status": "Done"}],
+        })
+
+        self.assertIn("15/06/2026 through 21/06/2026", prompt)
+        self.assertIn("Daily Brief is an intention", prompt)
+        self.assertIn("person described in SYSTEM_CONTEXT", prompt)
+        self.assertIn('"system_context": "Build a useful product."', prompt)
+
+
 class TaskExtractionTests(unittest.TestCase):
     def test_extracts_english_task_contract(self):
         brief = """## Daily Brief

@@ -9,6 +9,11 @@ ROOT="${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 ENV_FILE="$ROOT/.env"
 credential_id="$(grep -m1 '^N8N_NOTION_CREDENTIAL_ID=' "$ENV_FILE" | cut -d= -f2- | tr -d '\r\n')"
 [ -n "$credential_id" ] || { echo "N8N_NOTION_CREDENTIAL_ID is missing in $ENV_FILE" >&2; exit 1; }
+weekly_page_id="$(grep -m1 '^NOTION_WEEKLY_REVIEWS_PAGE_ID=' "$ENV_FILE" | cut -d= -f2- | tr -d '\r\n')"
+[ -n "$weekly_page_id" ] || {
+  echo "NOTION_WEEKLY_REVIEWS_PAGE_ID is missing in $ENV_FILE; create/share the Weekly Reviews page first" >&2
+  exit 1
+}
 
 # 1) Validate every workflow file before touching n8n.
 for source in "$ROOT"/workflows/*.json; do
@@ -42,6 +47,7 @@ ordered=(
   automatic-watch.workflow.json
   task-lifecycle.workflow.json
   daily-brief.workflow.json
+  weekly-review.workflow.json
 )
 ordered_paths=()
 for name in "${ordered[@]}"; do
