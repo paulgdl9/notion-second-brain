@@ -67,15 +67,22 @@ The brief proposes 1–3 tasks/day here; still-open and recently-completed tasks
 | Feedback    | Text   | result or blocker you write back; read by the brief |
 | Source      | Select | `Brief`, `Manual`                                 |
 | Proposed on | Date   | tasks older than ~7 days with `To do` are auto-abandoned |
-| Done on     | Date   | set when you mark a task `Done`                   |
+| Done on     | Date   | maintained automatically from `Status` every 10 minutes |
 
 ### Pages
 
 | Page             | `.env` variable             | Role                                                                 |
 |------------------|-----------------------------|----------------------------------------------------------------------|
 | Daily Brief      | `NOTION_DAILY_BRIEF_PAGE_ID`| Brief output. Keep a permanent first block as a header — new briefs are inserted right after it (most recent on top). |
-| Notes            | `NOTION_NOTES_PAGE_ID`      | Journal. Recognized `heading_2`/`heading_1` sections: `Today`, `Journal`, and `Todo`/`✅`. An `Archive`/`🗄` heading ends parsing. |
+| Notes            | `NOTION_NOTES_PAGE_ID`      | Journal. Recognized `heading_2`/`heading_1` sections: `Today`, `Journal`, and `Todo`/`✅`. The Daily Brief moves `Today` under yesterday's Journal date, then clears it. An `Archive`/`🗄` heading ends parsing. |
 | System Context   | `NOTION_CONTEXT_PAGE_ID`    | Free text read each morning as the brief's system context (who you are, projects, priorities, copilot rules). No personal data lives in the code. |
+
+The `Task Lifecycle (Done on)` workflow sets `Done on` when a task reaches `Done`, clears it when
+the task is reopened or abandoned, and sets a fresh completion date if it is completed again.
+
+The Notes rollover runs only when a new Daily Brief is due. It writes a `Daily notes` marker under
+yesterday's Journal date before clearing `Today`; retries detect that marker and never duplicate the
+archived notes.
 
 ## Sharing
 

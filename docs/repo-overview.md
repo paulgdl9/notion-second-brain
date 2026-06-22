@@ -50,18 +50,22 @@ tasks, reviews open tasks, and uses recently completed tasks as progress signals
 Every day at 7:00
   -> AI Inbox - pages (Notion getAll; alwaysOutputData)
   -> Prepare (Status=Inbox; always returns one item)
+  -> Brief: existing blocks
+  -> Skip existing brief (stop here when today's brief already exists)
   -> Notes - blocks
+  -> Prepare Notes rollover
+       |-> write Today under yesterday in Journal -> clear Today
+       \-> no notes -> continue
   -> System context - blocks
   -> Active objectives
   -> Tasks - all
   -> Enrich payload
   -> memo-bridge /brief (Claude, then Codex)
   -> Brief fallback if Claude fails
-       |-> Brief: first block
-       |     -> Build write payload
-       |          -> Notion: write brief
-       |               |-> IDs to process -> Mark Briefed
-       |               \-> Tasks to create -> Create tasks
+       |-> Build write payload
+       |     -> Notion: write brief
+       |          |-> IDs to process -> Mark Briefed
+       |          \-> Tasks to create -> Create tasks
        \-> Detect degradation -> Telegram alert
 
 Parallel branch from Tasks - all:
@@ -71,7 +75,27 @@ Parallel branch from Tasks - all:
 
 Notion's append-children API cannot prepend, but accepts `after: <block_id>`. The Daily Brief page
 must keep a permanent first block. New briefs are inserted after it so the newest brief stays at
-the top. If the first block is deleted, the workflow falls back to appending at the bottom.
+the top. If the first block is deleted, the workflow falls back to appending at the bottom. Before
+reading context or calling an LLM, the workflow scans the page headings for the current date and
+stops when that day's brief already exists.
+
+The Notes rollover copies non-empty blocks from `Today` under yesterday's Journal heading, writes a
+`Daily notes` marker, and only then archives the original blocks. Empty spacer blocks are cleared but
+not copied. If clearing fails after the write, the next run sees the marker and resumes cleanup
+without duplicating content. Unsupported or nested blocks stop the workflow instead of being lost.
+
+### Task lifecycle flow
+
+```text
+Every 10 minutes
+  -> read every row in Tasks
+  -> Status=Done and Done on empty: set Done on
+  -> Status!=Done and Done on present: clear Done on
+```
+
+This invariant makes reopening and completing a task again produce a fresh completion date. The
+Daily Brief also treats a just-completed task without a date as completed now, covering the short
+window before the lifecycle workflow runs.
 
 ## Important files
 
@@ -294,4 +318,5 @@ The full brief structure is:
 
 n8n and cloudflared images are pinned by version and digest. Docker logs rotate and process counts
 are limited to avoid exhausting the host or disk. CPU and memory remain dynamically available.
-CI compiles Python, runs bridge tests, validates workflow JSON, and lints shell scripts.
+CI compiles Python, runs bridge tests, executes embedded n8n Code-node JavaScript against fixtures,
+validates workflow JSON, and lints shell scripts.

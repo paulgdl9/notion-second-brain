@@ -1,6 +1,8 @@
 import importlib.util
 import pathlib
+import socket
 import unittest
+import urllib.error
 from unittest import mock
 
 
@@ -67,6 +69,37 @@ Nothing today.
 """
 
         self.assertEqual(memo_bridge.extract_tasks(brief)[0]["area"], "Knowledge")
+
+
+class PublicUrlTests(unittest.TestCase):
+    @staticmethod
+    def _address(ip):
+        return [(socket.AF_INET6 if ":" in ip else socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, 443))]
+
+    @mock.patch.object(memo_bridge.socket, "getaddrinfo")
+    def test_accepts_a_global_address(self, getaddrinfo):
+        getaddrinfo.return_value = self._address("93.184.216.34")
+
+        self.assertTrue(memo_bridge.is_public("https://example.com/article"))
+
+    @mock.patch.object(memo_bridge.socket, "getaddrinfo")
+    def test_rejects_private_and_mixed_dns_answers(self, getaddrinfo):
+        getaddrinfo.return_value = self._address("127.0.0.1")
+        self.assertFalse(memo_bridge.is_public("http://2130706433/admin"))
+
+        getaddrinfo.return_value = self._address("93.184.216.34") + self._address("10.0.0.4")
+        self.assertFalse(memo_bridge.is_public("https://mixed.example"))
+
+    def test_rejects_credentials_and_non_http_schemes(self):
+        self.assertFalse(memo_bridge.is_public("https://user:pass@example.com"))
+        self.assertFalse(memo_bridge.is_public("file:///etc/passwd"))
+
+    @mock.patch.object(memo_bridge, "is_public", return_value=False)
+    def test_rejects_redirects_to_non_public_urls(self, _is_public):
+        handler = memo_bridge.PublicOnlyRedirectHandler()
+
+        with self.assertRaises(urllib.error.HTTPError):
+            handler.redirect_request(mock.Mock(), None, 302, "Found", {}, "http://127.0.0.1")
 
 
 class SummarizeFallbackTests(unittest.TestCase):

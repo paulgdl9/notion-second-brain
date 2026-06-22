@@ -67,12 +67,15 @@ tunnel token. Secrets live only in `.env` (never committed); `.env.example` is t
 | Capture - Notion (AI Inbox) | Authenticated manual capture |
 | Daily Brief | Objective-driven daily synthesis |
 | Automatic Watch - AI Inbox | Configurable RSS watch |
+| Task Lifecycle (Done on) | Keeps task completion dates consistent |
 | Global Error Monitor | Failure alerts for every critical workflow |
 
 Daily Brief is an **objective-driven copilot**: it reads the Objectives database (the compass) plus
 open tasks from the Tasks database, AI Inbox captures, and the Notes journal. It proposes 1-3
 tasks/day that get written back into the Tasks database, reviews still-open tasks, and uses tasks marked `Done`
 in the last three days to propose the next logical step. It runs daily even with no new capture.
+Before generation, it archives the previous day's `Today` notes into the dated Journal section and
+clears `Today` without duplicating content on retries.
 All personal context and behavioral rules come from the Notion page `System Context`. The bridge
 contains no personal fallback and refuses contextual generation when that page is unavailable.
 
@@ -94,7 +97,8 @@ tunnel that is up as a container but no longer routing) every five minutes. n8n'
 workflow reports workflow and Notion failures independently.
 
 Continuous integration ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) compiles the
-Python sources, runs the bridge tests, validates every workflow JSON, and lints the shell scripts.
+Python sources, runs bridge and embedded workflow-code tests, validates every workflow JSON, and
+lints the shell scripts.
 
 Docker images are pinned by version and digest. Healthchecks, process limits, and bounded JSON logs
 are defined in `docker-compose.yml`; CPU and memory remain available dynamically.

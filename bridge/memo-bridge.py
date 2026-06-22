@@ -7,7 +7,18 @@ n8n POST /summarize {source,url,text} -> enriched object ready for Notion.
 - Infers the source (Twitter / Article) when none is provided.
 - Always creates a capture through a fallback instead of failing with a 502.
 """
-import json, os, re, shutil, subprocess, hmac, tempfile, urllib.request
+import hmac
+import ipaddress
+import json
+import os
+import re
+import shutil
+import socket
+import subprocess
+import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -27,7 +38,6 @@ MONITOR_STATE_DIR = os.environ.get("MONITOR_STATE_DIR") or str(Path(__file__).re
 JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 URL_RE = re.compile(r"https?://[^\s]+")
 TWEET_RE = re.compile(r"https?://(?:www\.|mobile\.)?(?:x\.com|twitter\.com)/", re.I)
-PRIVATE_RE = re.compile(r"^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)", re.I)
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 RAW_MAX = 1900  # Notion rich_text properties are limited to about 2,000 characters.
 
@@ -46,21 +56,51 @@ def first_url(text):
 
 
 def host_of(url):
-    m = re.match(r"https?://([^/]+)", url or "")
-    return m.group(1) if m else ""
+    try:
+        parsed = urllib.parse.urlsplit(url or "")
+        return parsed.hostname or ""
+    except ValueError:
+        return ""
 
 
 def is_public(url):
-    return bool(url) and not PRIVATE_RE.match(host_of(url))
+    try:
+        parsed = urllib.parse.urlsplit(url or "")
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return False
+        if parsed.username is not None or parsed.password is not None:
+            return False
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        addresses = {
+            info[4][0]
+            for info in socket.getaddrinfo(parsed.hostname, port, type=socket.SOCK_STREAM)
+        }
+        return bool(addresses) and all(ipaddress.ip_address(address).is_global for address in addresses)
+    except (OSError, ValueError):
+        return False
 
 
 def domain_of(url):
-    return host_of(url).replace("www.", "") or "lien"
+    return host_of(url).removeprefix("www.") or "link"
+
+
+class PublicOnlyRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Reject redirects that leave the public internet."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not is_public(newurl):
+            raise urllib.error.HTTPError(newurl, 403, "redirect to non-public URL", headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+HTTP_OPENER = urllib.request.build_opener(PublicOnlyRedirectHandler())
 
 
 def http_get(url, timeout=12):
+    if not is_public(url):
+        raise ValueError("URL must resolve to a public address")
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with HTTP_OPENER.open(req, timeout=timeout) as r:
         raw = r.read(2_000_000)
         ctype = r.headers.get("Content-Type", "")
         enc = "utf-8"

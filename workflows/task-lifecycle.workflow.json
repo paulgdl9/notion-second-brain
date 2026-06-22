@@ -1,0 +1,167 @@
+[
+  {
+    "id": "taskLifecycleDoneOn",
+    "name": "Task Lifecycle (Done on)",
+    "description": "Keeps the Tasks database completion date consistent with each task status.",
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes",
+                "minutesInterval": 10
+              }
+            ]
+          }
+        },
+        "id": "7c72a662-2a3d-4acd-af85-b09c98587fe4",
+        "name": "Every 10 minutes",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          240,
+          240
+        ]
+      },
+      {
+        "parameters": {
+          "resource": "databasePage",
+          "operation": "getAll",
+          "databaseId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_TASKS_DATABASE_ID }}",
+            "mode": "id",
+            "cachedResultName": "Tasks"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "id": "6fef503e-617f-44d9-b20f-023085898f87",
+        "name": "Read tasks",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          460,
+          240
+        ],
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion account"
+          }
+        },
+        "alwaysOutputData": true,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "const normalize = (value) => value.toString().toLowerCase().normalize('NFD')\n  .replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '');\nconst toText = (value) => {\n  if (value === undefined || value === null) return '';\n  if (Array.isArray(value)) return value.map(toText).filter(Boolean).join(', ');\n  if (typeof value === 'object') {\n    return value.name || value.value || value.plain_text || value.start ||\n      (value.text && value.text.content) || '';\n  }\n  return value.toString();\n};\nconst mapProperties = (json) => {\n  const mapped = {};\n  const source = { ...(json.properties || {}), ...json };\n  for (const key of Object.keys(source)) {\n    mapped[normalize(key.startsWith('property_') ? key.slice(9) : key)] = source[key];\n  }\n  return mapped;\n};\n\nconst updates = [];\nconst completedAt = new Date().toISOString();\nfor (const item of $input.all()) {\n  const json = item.json || {};\n  if (json.error) throw new Error('Unable to read Tasks from Notion');\n  if (!json.id) continue;\n  const mapped = mapProperties(json);\n  const status = toText(mapped.status);\n  const doneOn = toText(mapped.doneon);\n  if (status === 'Done' && !doneOn) {\n    updates.push({\n      json: {\n        id: json.id,\n        action: 'set',\n        body: { properties: { 'Done on': { date: { start: completedAt } } } },\n      },\n    });\n  } else if (status !== 'Done' && doneOn) {\n    updates.push({\n      json: {\n        id: json.id,\n        action: 'clear',\n        body: { properties: { 'Done on': { date: null } } },\n      },\n    });\n  }\n}\nreturn updates;"
+        },
+        "id": "7bd334c0-177c-4da1-9589-1fdfb3b409aa",
+        "name": "Build date updates",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          680,
+          240
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "={{ 'https://api.notion.com/v1/pages/' + $json.id }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "notionApi",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Notion-Version",
+                "value": "2022-06-28"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json.body) }}",
+          "options": {
+            "timeout": 15000
+          }
+        },
+        "id": "a74a2334-c8c9-43c3-92d0-5b98f31837e4",
+        "name": "Update completion date",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          900,
+          240
+        ],
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Every 10 minutes": {
+        "main": [
+          [
+            {
+              "node": "Read tasks",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read tasks": {
+        "main": [
+          [
+            {
+              "node": "Build date updates",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build date updates": {
+        "main": [
+          [
+            {
+              "node": "Update completion date",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "availableInMCP": false,
+      "callerPolicy": "workflowsFromSameOwner",
+      "errorWorkflow": "globalErrorMonitor"
+    },
+    "staticData": {
+      "node:Every 10 minutes": {
+        "recurrenceRules": []
+      }
+    },
+    "meta": null,
+    "nodeGroups": [],
+    "pinData": {},
+    "versionId": "af4886fa-1a75-4c44-9a25-8c05cec860dd",
+    "activeVersionId": "af4886fa-1a75-4c44-9a25-8c05cec860dd",
+    "versionCounter": 1,
+    "triggerCount": 1,
+    "sourceWorkflowId": null,
+    "tags": []
+  }
+]
