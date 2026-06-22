@@ -11,7 +11,8 @@ integration**, and their IDs copied into `.env`.
 2. Share each duplicated database/page with your integration (see "Sharing" below).
 3. Copy each ID into `.env` (see "IDs" below).
 
-> The template URL is a placeholder until published. Until then, use Option B.
+> The template schema is already in English, but its public duplication URL has not been published
+> yet. Until that Notion UI step is complete, use Option B.
 
 ## Option B — recreate the schema by hand
 
