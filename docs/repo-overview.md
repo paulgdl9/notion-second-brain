@@ -276,6 +276,19 @@ prompt. The response exposes `engine` and `context_source`:
 `/summarize` follows the same Claude-to-Codex chain, then preserves the capture through a local
 fallback. Generation routes report `claude`, `codex`, or `none` in the `engine` field.
 
+The Claude and Codex attempts share a single wall-clock budget (`BRIEF_BUDGET`, `SUMMARIZE_BUDGET`,
+`CODEX_RESERVE_SECONDS`) kept under the n8n HTTP node timeouts, so a slow Claude can no longer
+consume the whole budget and leave the Codex fallback no time to answer.
+
+### Outbound content fetch
+
+Before summarizing a URL the bridge fetches its content (the LLM has no web access). By default it
+uses Jina Reader (`r.jina.ai`) for clean extraction and `api.fxtwitter.com` for tweets, so the
+captured URL is disclosed to those services. Set `MEMO_USE_JINA=0` to use the built-in HTML parser
+instead (tweets still use FxTwitter). Every fetch is restricted to public addresses, and the
+resolved IP is pinned for the connection so a hostname that passed validation cannot rebind to a
+private host.
+
 ## Weekly Review contract
 
 Every Sunday at 19:00, `Weekly Review` reads System Context, the week's Daily Briefs, dated Journal

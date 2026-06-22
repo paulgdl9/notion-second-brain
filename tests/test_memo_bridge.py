@@ -129,7 +129,8 @@ class SummarizeFallbackTests(unittest.TestCase):
 
         self.assertEqual(parsed, expected)
         self.assertEqual(engine, "codex")
-        run_codex.assert_called_once_with("content")
+        run_codex.assert_called_once()
+        self.assertEqual(run_codex.call_args.args[0], "content")
 
     @mock.patch.object(memo_bridge, "run_codex_json", return_value=None)
     @mock.patch.object(memo_bridge, "run_claude", return_value=None)
@@ -153,6 +154,100 @@ class RunClaudeTests(unittest.TestCase):
         failed = mock.Mock(returncode=1, stdout='{"title": "ignored"}')
         with mock.patch.object(memo_bridge.subprocess, "run", return_value=failed):
             self.assertIsNone(memo_bridge.run_claude("content"))
+
+
+class EngineBudgetTests(unittest.TestCase):
+    """The bridge runs Claude then Codex in sequence; the whole chain must fit inside
+    the n8n HTTP node timeout, or a slow Claude consumes the budget and the Codex
+    fallback — though started — is discarded client-side. These guard that split."""
+
+    def test_brief_reserves_time_for_the_codex_fallback(self):
+        seen = {}
+
+        def fake_claude(prompt, model, timeout):
+            seen["claude_timeout"] = timeout
+            return ""  # Claude fails -> Codex must still get a usable slice.
+
+        def fake_codex(prompt, timeout):
+            seen["codex_timeout"] = timeout
+            return "brief from codex"
+
+        with mock.patch.object(memo_bridge, "run_claude_text", fake_claude), \
+             mock.patch.object(memo_bridge, "run_codex_text", fake_codex):
+            text, engine = memo_bridge.run_brief_engine("p", "m", budget=210)
+
+        self.assertEqual((text, engine), ("brief from codex", "codex"))
+        self.assertLessEqual(seen["claude_timeout"], 210 - memo_bridge.ENGINE_MIN_SECONDS)
+        self.assertGreaterEqual(seen["codex_timeout"], memo_bridge.ENGINE_MIN_SECONDS)
+
+    def test_brief_skips_codex_when_no_budget_remains(self):
+        with mock.patch.object(memo_bridge, "run_claude_text", return_value=""), \
+             mock.patch.object(memo_bridge, "run_codex_text") as codex:
+            text, engine = memo_bridge.run_brief_engine(
+                "p", "m", budget=memo_bridge.ENGINE_MIN_SECONDS - 1)
+
+        self.assertEqual((text, engine), ("", "none"))
+        codex.assert_not_called()
+
+    def test_summarize_reserves_time_for_the_codex_fallback(self):
+        seen = {}
+
+        def fake_claude(text, timeout):
+            seen["claude_timeout"] = timeout
+            return None
+
+        def fake_codex(text, timeout):
+            seen["codex_timeout"] = timeout
+            return {"title": "from codex"}
+
+        with mock.patch.object(memo_bridge, "run_claude", fake_claude), \
+             mock.patch.object(memo_bridge, "run_codex_json", fake_codex):
+            parsed, engine = memo_bridge.run_summarize_engine("content", budget=120)
+
+        self.assertEqual(engine, "codex")
+        self.assertEqual(parsed, {"title": "from codex"})
+        self.assertLessEqual(seen["claude_timeout"], 120 - memo_bridge.ENGINE_MIN_SECONDS)
+        self.assertGreaterEqual(seen["codex_timeout"], memo_bridge.ENGINE_MIN_SECONDS)
+
+
+class PinnedDnsTests(unittest.TestCase):
+    """The fetch connection dials a pre-validated IP so a name that passed the public-address
+    check cannot rebind to a private host between validation and connect."""
+
+    @mock.patch.object(memo_bridge.socket, "getaddrinfo")
+    def test_returns_a_validated_public_ip(self, getaddrinfo):
+        getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))]
+        self.assertEqual(memo_bridge._require_public_ip("example.com", 443), "93.184.216.34")
+
+    @mock.patch.object(memo_bridge.socket, "getaddrinfo")
+    def test_rejects_private_or_mixed_resolution(self, getaddrinfo):
+        getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.5", 443))]
+        with self.assertRaises(urllib.error.URLError):
+            memo_bridge._require_public_ip("rebind.example", 443)
+
+        getaddrinfo.return_value = [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443)),
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443)),
+        ]
+        with self.assertRaises(urllib.error.URLError):
+            memo_bridge._require_public_ip("mixed.example", 443)
+
+
+class FetchPageTests(unittest.TestCase):
+    def test_jina_disabled_skips_the_third_party(self):
+        with mock.patch.object(memo_bridge, "USE_JINA", False), \
+             mock.patch.object(memo_bridge, "fetch_via_jina") as jina, \
+             mock.patch.object(memo_bridge, "http_get", return_value=("<html>hi</html>", "text/html")):
+            out = memo_bridge.fetch_page("https://example.com/article")
+        jina.assert_not_called()
+        self.assertIn("hi", out)
+
+    def test_jina_used_when_enabled(self):
+        with mock.patch.object(memo_bridge, "USE_JINA", True), \
+             mock.patch.object(memo_bridge, "fetch_via_jina", return_value="clean text") as jina:
+            out = memo_bridge.fetch_page("https://example.com/article")
+        jina.assert_called_once()
+        self.assertEqual(out, "clean text")
 
 
 if __name__ == "__main__":
