@@ -3,6 +3,10 @@ services:
     image: docker.n8n.io/n8nio/n8n:2.26.8@sha256:0afb71a39e51637b4d5b4010d90e68bc502d3ca1d2a4d953eb5fcd7d86330ccd
     container_name: n8n
     restart: unless-stopped
+    # n8n is published on the host at N8N_BIND (default 127.0.0.1 = local only, for tunnel mode).
+    # Set N8N_BIND=0.0.0.0 (or a LAN/VPN IP) in .env for lan/vpn access.
+    ports:
+      - "${N8N_BIND:-127.0.0.1}:5678:5678"
     env_file:
       - ./.env
     environment:
@@ -10,7 +14,7 @@ services:
       - TZ=${TIMEZONE:-UTC}
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
       - N8N_HOST=${N8N_HOST:?set N8N_HOST in .env}
-      - N8N_PROTOCOL=https
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-https}
       - WEBHOOK_URL=${N8N_PUBLIC_URL:?set N8N_PUBLIC_URL in .env}/
       - N8N_EDITOR_BASE_URL=${N8N_PUBLIC_URL:?set N8N_PUBLIC_URL in .env}
       - N8N_PROXY_HOPS=1
@@ -38,6 +42,9 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:2026.6.1@sha256:6d91c121b803126f7a5344005d17a9324788fc09d305b6e2560ec6040a7ae283
     container_name: cloudflared
+    # Optional: only starts when the "tunnel" profile is active
+    # (set COMPOSE_PROFILES=tunnel in .env). Omit it for lan/vpn access.
+    profiles: ["tunnel"]
     restart: unless-stopped
     command: tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN}
     depends_on:

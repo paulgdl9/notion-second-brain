@@ -12,25 +12,48 @@ The exact Notion databases and pages to create are described in
 
 ```bash
 git clone <this-repo> second-brain && cd second-brain
-./install.sh                      # 1st run: creates .env, then asks you to fill it
-$EDITOR .env                      # secrets, Notion IDs, Telegram, RSS feeds
-./install.sh                      # 2nd run: units + docker + workflow import
+./install.sh         # 1st run: creates .env + asks how you'll reach n8n
+nano .env            # fill secrets, Notion IDs, Telegram, RSS feeds
+./install.sh         # 2nd run: installs services, starts Docker, imports workflows
 ```
 
-`install.sh` is idempotent. It checks prerequisites (Docker, `docker compose`, Python 3, `jq`,
-and the `claude`/`codex` CLIs), creates `.env` from `.env.example`, renders the systemd units
-from the `systemd/*.in` templates for the current user and path, starts the Docker stack, and
-imports the workflows once `N8N_NOTION_CREDENTIAL_ID` is set.
+That's it — `install.sh` is idempotent, re-run it any time.
 
-Prerequisites you install yourself: Docker Engine + compose plugin, Python 3, `jq`, a Cloudflare
-tunnel token, a Notion integration, and the `claude` (and optionally `codex`) CLI on `PATH`.
+### How will you reach n8n? (the only real choice)
 
-Secrets live only in `.env` (never committed). Use `.env.example` as the template.
+The first run asks **one question** and wires everything for you. **No public exposure is
+required**: the daily brief only makes *outbound* calls to Notion and Claude. The only things that
+ever need to *reach* n8n are your phone's capture shortcut and the editor UI — so pick the mode
+that fits:
+
+| Mode | Exposure | Pick it when |
+|------|----------|--------------|
+| **LAN only** | none | you capture / administer from your home network only |
+| **Tailscale / VPN** *(recommended)* | no open ports | you want access from anywhere, zero exposure |
+| **Cloudflare Tunnel** | public hostname | you want a public URL (needs a `CLOUDFLARED_TOKEN`) |
+
+LAN and VPN modes never start the `cloudflared` container and never open a port on your router.
+Switch later anytime: edit `ACCESS_MODE` (and the `N8N_*` vars) in `.env` and re-run `./install.sh`.
+
+### What `install.sh` does
+
+1. **Preflight** — checks Docker, `docker compose`, Python 3, `jq`; locates the `claude`/`codex` CLIs.
+2. **`.env`** — creates it from `.env.example`, fills CLI paths, asks the access-mode question.
+3. **systemd** — renders the bridge + watchdog units from `systemd/*.in` for your user and path.
+4. **Docker** — starts n8n (plus `cloudflared` only in tunnel mode).
+5. **Workflows** — imports + publishes them once `N8N_NOTION_CREDENTIAL_ID` is set.
+
+### Prerequisites you install yourself
+
+Docker Engine + the compose plugin, Python 3, `jq`, a [Notion integration](docs/notion-setup.md),
+the `claude` CLI (and optionally `codex`) on your `PATH`, and — only for tunnel mode — a Cloudflare
+tunnel token. Secrets live only in `.env` (never committed); `.env.example` is the template.
 
 ## Services
 
-- `docker-compose.yml` runs `n8n` and `cloudflared`. The n8n container reaches the host bridge
-  via `host.docker.internal` (mapped through `extra_hosts`), so no gateway IP is hard-coded.
+- `docker-compose.yml` runs `n8n` (and `cloudflared` only in tunnel mode — it sits behind a
+  Compose profile). The n8n container reaches the host bridge via `host.docker.internal`
+  (mapped through `extra_hosts`), so no gateway IP is hard-coded.
 - `systemd/*.service.in` are templates rendered by `install.sh` for the current user/path
   (bridge + watchdog). Edit the templates, not the installed units under `/etc/systemd/system`.
 - `bridge/memo-bridge.py` exposes `/summarize` (Haiku → Codex) and `/brief` (Sonnet → Codex) for n8n.

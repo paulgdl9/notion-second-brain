@@ -9,7 +9,10 @@ Il sert a garder sous Git tout ce qui decrit le systeme, tout en laissant les se
 Le systeme est compose de quatre briques principales :
 
 - `n8n`, lance par Docker Compose, expose les workflows via `N8N_PUBLIC_URL`.
-- `cloudflared`, lance par Docker Compose, maintient le tunnel Cloudflare vers n8n.
+- `cloudflared`, lancé par Docker Compose **uniquement en mode tunnel** (profil Compose `tunnel`,
+  via `COMPOSE_PROFILES`). En mode LAN/VPN il ne démarre pas et aucun port n'est ouvert sur la box.
+  Le brief n'a de toute façon besoin que d'appels **sortants** (Notion, Claude) ; l'exposition ne
+  sert qu'au webhook de capture et à l'éditeur. Mode choisi par `install.sh` (`ACCESS_MODE`).
 - `memo-bridge`, lance par systemd, expose une API locale sur le Raspberry Pi pour enrichir ou generer du contenu avec Claude.
 - Notion, utilise comme base `Inbox IA` et comme destination du Daily Brief.
 
