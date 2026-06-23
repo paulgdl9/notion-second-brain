@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 500" role="img" aria-labelledby="t d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title id="t">Daily Brief example</title>
+  <desc id="d">An illustrative Daily Brief with follow-up, connections, blind spots, today's tasks, a learning item and a question. All content is fictional.</desc>
+  <rect x="6" y="6" width="708" height="488" rx="14" fill="#ffffff" stroke="#E3E2DE" stroke-width="1"/>
+
+  <text x="32" y="46" font-size="20" font-weight="600" fill="#37352F">🗓️  Daily Brief — 22/06/2026</text>
+  <rect x="558" y="29" width="130" height="24" rx="12" fill="#F1F0ED"/>
+  <text x="623" y="45" font-size="12" fill="#787774" text-anchor="middle">claude · notion</text>
+  <line x1="32" y1="64" x2="688" y2="64" stroke="#ECEBE8" stroke-width="1"/>
+
+  <text x="32" y="92" font-size="15" font-weight="600" fill="#37352F">📌  Follow-up</text>
+  <text x="32" y="113" font-size="13.5" fill="#4A4A47">“Ship onboarding emails” (done) — measure the open rate before writing email #4.</text>
+  <text x="32" y="132" font-size="13.5" fill="#4A4A47">“Refactor billing webhook” still open since Monday — the priority: it blocks launch.</text>
+
+  <text x="32" y="160" font-size="15" font-weight="600" fill="#37352F">🔗  Connections</text>
+  <text x="32" y="181" font-size="13.5" fill="#4A4A47">“Users churn after day 2” + goal “reach 50 paying users” → instrument activation,</text>
+  <text x="32" y="200" font-size="13.5" fill="#4A4A47">not just signups. The onboarding flow is the lever.</text>
+
+  <text x="32" y="228" font-size="15" font-weight="600" fill="#37352F">⚡  Contradictions / blind spots</text>
+  <text x="32" y="249" font-size="13.5" fill="#4A4A47">You name growth as the priority — but 4 of your 5 open tasks are infrastructure.</text>
+
+  <text x="32" y="277" font-size="15" font-weight="600" fill="#37352F">✅  Today's tasks</text>
+  <text x="32" y="298" font-size="13.5" fill="#4A4A47"><tspan fill="#6E62C4" font-weight="600">[Projects]</tspan>  Add an activation event to onboarding — measures the day-2 drop.</text>
+  <text x="32" y="317" font-size="13.5" fill="#4A4A47"><tspan fill="#6E62C4" font-weight="600">[Work]</tspan>  Send the billing-webhook fix for review — unblocks the paid launch.</text>
+  <text x="32" y="336" font-size="13.5" fill="#4A4A47"><tspan fill="#6E62C4" font-weight="600">[Health]</tspan>  30-min zone-2 run — recovery day in your plan.</text>
+
+  <text x="32" y="364" font-size="15" font-weight="600" fill="#37352F">🎓  To learn</text>
+  <text x="32" y="385" font-size="13.5" fill="#4A4A47">Postgres partial indexes — your webhook query scans the whole events table.</text>
+
+  <text x="32" y="413" font-size="15" font-weight="600" fill="#37352F">❓  Question to explore</text>
+  <text x="32" y="434" font-size="13.5" fill="#4A4A47">What single metric tells you the product is “working” — and are you tracking it today?</text>
+
+  <text x="32" y="470" font-size="11.5" fill="#9B9A97">Illustrative example — fictional content. Your real brief is generated from your own Notion.</text>
+</svg>

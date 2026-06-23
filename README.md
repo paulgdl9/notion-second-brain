@@ -8,6 +8,16 @@ Full operational documentation lives in [`docs/repo-overview.md`](docs/repo-over
 The exact Notion databases and pages to create are described in
 [`docs/notion-setup.md`](docs/notion-setup.md).
 
+## What it produces
+
+Every morning the Daily Brief turns your objectives, open tasks and captures into a focused,
+objective-driven plan — written straight to Notion:
+
+![Daily Brief example](docs/assets/daily-brief-example.svg)
+
+*Illustrative example (fictional content) — see the [full Markdown version](docs/examples/daily-brief.md).
+Your real brief is generated from your own Notion.*
+
 ## Quick start
 
 ```bash
