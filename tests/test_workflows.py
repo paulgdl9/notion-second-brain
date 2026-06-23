@@ -71,6 +71,14 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("Run manually", nodes)
         self.assertNotRegex(content, r"[0-9a-f]{32}")
 
+    def test_no_workflow_leaks_a_raw_notion_id(self):
+        # A bare 32-hex run is the shape of a Notion ID. Exports must reference the
+        # Notion credential via the __NOTION_CREDENTIAL_ID__ placeholder and every
+        # Notion resource via env, so no real ID should appear in any workflow file.
+        for path in sorted(WORKFLOW_DIR.glob("*.json")):
+            content = path.read_text(encoding="utf-8")
+            self.assertNotRegex(content, r"[0-9a-f]{32}", path.name)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,7 +7,7 @@ integration**, and their IDs copied into `.env`.
 
 ## Option A — duplicate the template (recommended)
 
-1. Open the [Second Brain template](https://app.notion.com/p/Second-Brain-Template-387d8df51dea813292a9c3f1af754fbe) and click **Duplicate**.
+1. Open the [Second Brain template](https://bramble-suede-b88.notion.site/Second-Brain-Template-387d8df51dea813292a9c3f1af754fbe) and click **Duplicate**.
 2. Share each duplicated database/page with your integration (see "Sharing" below).
 3. Copy each ID into `.env` (see "IDs" below).
 
