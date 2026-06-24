@@ -56,6 +56,9 @@ class WeeklyPromptTests(unittest.TestCase):
         self.assertIn("15/06/2026 through 21/06/2026", prompt)
         self.assertIn("Daily Brief is an intention", prompt)
         self.assertIn("person described in SYSTEM_CONTEXT", prompt)
+        self.assertIn("memory_lint", prompt)
+        self.assertIn("Memory maintenance", prompt)
+        self.assertIn("Memory patch", prompt)
         self.assertIn('"system_context": "Build a useful product."', prompt)
 
 

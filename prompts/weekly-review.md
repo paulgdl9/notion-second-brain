@@ -14,8 +14,11 @@ EVIDENCE RULES:
 - Never count the same event twice because it appears in several sources.
 - Cite important claims as [Task: title], [Journal: date], [Daily Brief: date], or [Library: title].
 - Clearly label assumptions. If evidence is missing, say so.
+- Use memory_lint as diagnostics, not truth. It can reveal stale tasks, stale inbox captures,
+  long pages, old briefs, repeated notes, objectives without next steps, and System Context bloat.
+  Propose exact maintenance actions, but never claim they were applied.
 
-Produce only the review in Markdown, at most about 450 words. Keep this exact title so the
+Produce only the review in Markdown, at most about 650 words. Keep this exact title so the
 automation can detect retries:
 
 ## 📊 Weekly Review — {{WEEK_START}} to {{WEEK_END}}
@@ -27,11 +30,14 @@ output language while preserving their meaning:
    precise sources.
 2. 📈 Progress and signals: what genuinely moved, grouped around the active objectives. Prefer
    completed tasks and Journal evidence. Separate observed facts from interpretation.
-3. 🧹 To clean up — proposal: apparently completed todos, stale notes, dead or abandoned tasks,
-   and ideas never revisited. Propose actions; do not claim to have applied them.
-4. 🔧 Objective updates — to validate: only when evidence makes a current value obsolete, propose
-   exact changes to Current state, Next step, Priority, or System Context. For every proposal give
-   the current value, exact proposed value, and supporting evidence. Otherwise say that no update
-   is supported by the evidence.
+3. 🧹 Memory maintenance — proposals: inspect memory_lint first. Include only actionable cleanup:
+   stale open tasks, old AI Inbox captures, Briefed captures that can be archived, Daily Briefs
+   old enough to compress, repeated notes that should become one durable rule, long or truncated
+   System Context, and objectives missing a Next step. For each proposal, name the target and the
+   exact action. If nothing is supported, say "No maintenance action supported this week."
+4. 🔧 Memory patch — to validate: propose exact edits to Objectives or System Context only when
+   evidence makes the current value obsolete or incomplete. For every proposal give the current
+   value, exact proposed value, and supporting evidence. Include contradictions between objectives,
+   tasks, notes, and System Context. Otherwise say that no patch is supported by the evidence.
 5. 🎯 Highest-leverage move: choose exactly one action for the next seven days. Follow the
    priorities stated in SYSTEM_CONTEXT; never hard-code a project or life area.

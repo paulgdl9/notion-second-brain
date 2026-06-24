@@ -222,12 +222,41 @@
         }
       },
       {
+        "id": "weekly-inbox",
+        "name": "AI Inbox",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          1760,
+          240
+        ],
+        "alwaysOutputData": true,
+        "parameters": {
+          "resource": "databasePage",
+          "operation": "getAll",
+          "databaseId": {
+            "__rl": true,
+            "value": "={{ $env.NOTION_INBOX_DATABASE_ID }}",
+            "mode": "id",
+            "cachedResultName": "AI Inbox"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "__NOTION_CREDENTIAL_ID__",
+            "name": "Notion account"
+          }
+        }
+      },
+      {
         "id": "weekly-library-check",
         "name": "Library configured?",
         "type": "n8n-nodes-base.if",
         "typeVersion": 2.2,
         "position": [
-          1760,
+          1980,
           240
         ],
         "parameters": {
@@ -264,7 +293,7 @@
         "type": "n8n-nodes-base.notion",
         "typeVersion": 2.2,
         "position": [
-          1980,
+          2200,
           140
         ],
         "alwaysOutputData": true,
@@ -293,12 +322,12 @@
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
-          2200,
+          2420,
           240
         ],
         "parameters": {
           "mode": "runOnceForAllItems",
-          "jsCode": "const period = $('Prepare review period').first().json || {};\nconst start = new Date(period.start_iso + 'T00:00:00');\nconst end = new Date(period.end_iso + 'T23:59:59.999');\nconst inPeriod = value => {\n  if (!value) return false;\n  const date = new Date(value);\n  return Number.isFinite(date.getTime()) && date >= start && date <= end;\n};\nconst getText = block => {\n  if (typeof block.content === 'string') return block.content;\n  const content = block[block.type];\n  return content ? (content.rich_text || []).map(text => text.plain_text || '').join('') : '';\n};\nconst normalize = value => (value || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '');\nconst toText = value => {\n  if (value === undefined || value === null) return '';\n  if (Array.isArray(value)) return value.map(toText).filter(Boolean).join(', ');\n  if (typeof value === 'object') return value.name || value.value || value.plain_text || value.start || (value.text && value.text.content) || '';\n  return value.toString();\n};\nconst mapped = json => {\n  const result = {};\n  const source = { ...(json.properties || {}), ...json };\n  for (const key of Object.keys(source)) result[normalize(key.startsWith('property_') ? key.slice(9) : key)] = source[key];\n  return result;\n};\nconst field = (properties, names) => {\n  for (const name of names) { const value = toText(properties[name]); if (value) return value; }\n  return '';\n};\nconst nodeItems = name => {\n  const items = $(name).all();\n  if (items.some(item => item.json && item.json.error)) throw new Error('Notion read failed: ' + name);\n  return items.map(item => item.json || {});\n};\n\nconst contextLines = [];\nfor (const block of nodeItems('System context')) {\n  const text = getText(block).trim();\n  if (text) contextLines.push(block.type && block.type.startsWith('heading_') ? '## ' + text : '- ' + text);\n}\nconst system_context = contextLines.join('\\n').slice(0, 16000);\nif (!system_context) throw new Error('System Context is empty');\n\nconst journal = [];\nconst todos = [];\nlet section = '';\nlet journalDate = '';\nfor (const block of nodeItems('Notes')) {\n  const text = getText(block).trim();\n  if (block.type === 'heading_1' || block.type === 'heading_2') {\n    if (text.includes('Journal')) section = 'journal';\n    else if (text.includes('Todo') || text.includes('✅')) section = 'todos';\n    else if (text.includes('Archive') || text.includes('🗄')) break;\n    else section = '';\n    continue;\n  }\n  if (section === 'journal' && block.type === 'heading_3') {\n    const match = text.match(/(\\d{2})\\/(\\d{2})\\/(\\d{4})/);\n    journalDate = match ? `${match[3]}-${match[2]}-${match[1]}` : '';\n    continue;\n  }\n  if (!text) continue;\n  if (section === 'journal' && inPeriod(journalDate)) journal.push({ date: journalDate, text });\n  if (section === 'todos') todos.push({ text, checked: Boolean(block.checked ?? ((block.to_do || {}).checked)) });\n}\n\nconst objectives = [];\nfor (const row of nodeItems('Objectives')) {\n  const p = mapped(row);\n  const name = field(p, ['name']);\n  if (!name) continue;\n  objectives.push({ name, status: field(p, ['status']), area: field(p, ['area']), priority: field(p, ['priority']), current_state: field(p, ['currentstate']), next_step: field(p, ['nextstep']), horizon: field(p, ['horizon']) });\n}\n\nconst tasks = [];\nfor (const row of nodeItems('Tasks')) {\n  const p = mapped(row);\n  const title = field(p, ['task']);\n  if (!title) continue;\n  const status = field(p, ['status']);\n  const proposed_on = field(p, ['proposedon']);\n  const done_on = field(p, ['doneon']);\n  if (status === 'Done' && !inPeriod(done_on)) continue;\n  if (status === 'Abandoned' && !inPeriod(proposed_on) && !inPeriod(field(p, ['lasteditedtime']))) continue;\n  tasks.push({ title, status, area: field(p, ['area']), why: field(p, ['why']), feedback: field(p, ['feedback']), proposed_on, done_on });\n}\n\nconst daily_briefs = [];\nlet current = null;\nfor (const block of nodeItems('Daily Briefs')) {\n  const text = getText(block).trim();\n  if (block.type === 'heading_2') {\n    const match = text.match(/Daily Brief[^0-9]*(\\d{2})\\/(\\d{2})\\/(\\d{4})/i);\n    const isoDate = match ? `${match[3]}-${match[2]}-${match[1]}` : '';\n    current = inPeriod(isoDate) ? { date: isoDate, content: [] } : null;\n    if (current) daily_briefs.push(current);\n    continue;\n  }\n  if (current && text) current.content.push(text);\n}\n\nconst library = [];\nconst libraryRows = $env.NOTION_LIBRARY_DATABASE_ID ? nodeItems('Library') : [];\nfor (const row of libraryRows) {\n  const p = mapped(row);\n  const title = field(p, ['name', 'title']);\n  const date = field(p, ['publishedat', 'capturedat', 'createdtime', 'lasteditedtime']);\n  if (title && (!date || inPeriod(date))) library.push({ title, date, author: field(p, ['author']), category: field(p, ['category', 'type']), summary: field(p, ['summary', 'highlights']) });\n}\n\nreturn [{ json: { ...period, language: $env.WEEKLY_LANGUAGE || 'French', system_context, journal: journal.slice(0, 100), todos: todos.slice(0, 100), objectives: objectives.slice(0, 50), tasks: tasks.slice(0, 150), daily_briefs: daily_briefs.slice(0, 7), library: library.slice(0, 50) } }];\n"
+          "jsCode": "const period = $('Prepare review period').first().json || {};\nconst start = new Date(period.start_iso + 'T00:00:00');\nconst end = new Date(period.end_iso + 'T23:59:59.999');\nconst dayMs = 86400000;\nconst parseDate = value => {\n  if (!value) return null;\n  const date = new Date(value);\n  return Number.isFinite(date.getTime()) ? date : null;\n};\nconst inPeriod = value => {\n  const date = parseDate(value);\n  return Boolean(date && date >= start && date <= end);\n};\nconst ageDays = value => {\n  const date = parseDate(value);\n  if (!date) return null;\n  return Math.floor((end - date) / dayMs);\n};\nconst getText = block => {\n  if (typeof block.content === 'string') return block.content;\n  const content = block[block.type];\n  return content ? (content.rich_text || []).map(text => text.plain_text || '').join('') : '';\n};\nconst normalize = value => (value || '').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '');\nconst toText = value => {\n  if (value === undefined || value === null) return '';\n  if (Array.isArray(value)) return value.map(toText).filter(Boolean).join(', ');\n  if (typeof value === 'object') return value.name || value.value || value.plain_text || value.start || (value.text && value.text.content) || '';\n  return value.toString();\n};\nconst mapped = json => {\n  const result = {};\n  const source = { ...(json.properties || {}), ...json };\n  for (const key of Object.keys(source)) result[normalize(key.startsWith('property_') ? key.slice(9) : key)] = source[key];\n  return result;\n};\nconst field = (properties, names) => {\n  for (const name of names) { const value = toText(properties[name]); if (value) return value; }\n  return '';\n};\nconst nodeItems = name => {\n  const items = $(name).all();\n  if (items.some(item => item.json && item.json.error)) throw new Error('Notion read failed: ' + name);\n  return items.map(item => item.json || {});\n};\nconst repeatedEntries = entries => {\n  const seen = new Map();\n  for (const entry of entries) {\n    const text = (entry.text || '').trim();\n    const key = normalize(text).slice(0, 120);\n    if (!key || key.length < 12) continue;\n    const current = seen.get(key) || { text, count: 0, sources: [] };\n    current.count += 1;\n    if (entry.source && current.sources.length < 5) current.sources.push(entry.source);\n    seen.set(key, current);\n  }\n  return Array.from(seen.values()).filter(entry => entry.count >= 3).slice(0, 10);\n};\n\nconst systemContextBlocks = nodeItems('System context');\nconst contextLines = [];\nfor (const block of systemContextBlocks) {\n  const text = getText(block).trim();\n  if (text) contextLines.push(block.type && block.type.startsWith('heading_') ? '## ' + text : '- ' + text);\n}\nconst systemContextFull = contextLines.join('\\n');\nconst system_context = systemContextFull.slice(0, 16000);\nif (!system_context) throw new Error('System Context is empty');\n\nconst noteBlocks = nodeItems('Notes');\nconst journal = [];\nconst todos = [];\nlet section = '';\nlet journalDate = '';\nfor (const block of noteBlocks) {\n  const text = getText(block).trim();\n  if (block.type === 'heading_1' || block.type === 'heading_2') {\n    if (text.includes('Journal')) section = 'journal';\n    else if (text.includes('Todo') || text.includes('✅')) section = 'todos';\n    else if (text.includes('Archive') || text.includes('🗄')) break;\n    else section = '';\n    continue;\n  }\n  if (section === 'journal' && block.type === 'heading_3') {\n    const match = text.match(/(\\d{2})\\/(\\d{2})\\/(\\d{4})/);\n    journalDate = match ? `${match[3]}-${match[2]}-${match[1]}` : '';\n    continue;\n  }\n  if (!text) continue;\n  if (section === 'journal' && inPeriod(journalDate)) journal.push({ date: journalDate, text });\n  if (section === 'todos') todos.push({ text, checked: Boolean(block.checked ?? ((block.to_do || {}).checked)) });\n}\n\nconst objectives = [];\nconst activeObjectivesWithoutNextStep = [];\nfor (const row of nodeItems('Objectives')) {\n  const p = mapped(row);\n  const name = field(p, ['name']);\n  if (!name) continue;\n  const objective = {\n    name,\n    status: field(p, ['status']),\n    area: field(p, ['area']),\n    priority: field(p, ['priority']),\n    current_state: field(p, ['currentstate']),\n    next_step: field(p, ['nextstep']),\n    horizon: field(p, ['horizon']),\n  };\n  objectives.push(objective);\n  if (objective.status === 'Active' && !objective.next_step) {\n    activeObjectivesWithoutNextStep.push({\n      name: objective.name,\n      area: objective.area,\n      priority: objective.priority,\n      current_state: objective.current_state,\n    });\n  }\n}\n\nconst tasks = [];\nconst staleOpenTasks = [];\nconst openTasksWithoutProposedOn = [];\nfor (const row of nodeItems('Tasks')) {\n  const p = mapped(row);\n  const title = field(p, ['task']);\n  if (!title) continue;\n  const status = field(p, ['status']);\n  const proposed_on = field(p, ['proposedon']);\n  const done_on = field(p, ['doneon']);\n  const task = { title, status, area: field(p, ['area']), why: field(p, ['why']), feedback: field(p, ['feedback']), proposed_on, done_on };\n  if (status === 'Done' && !inPeriod(done_on)) continue;\n  if (status === 'Abandoned' && !inPeriod(proposed_on) && !inPeriod(field(p, ['lasteditedtime']))) continue;\n  tasks.push(task);\n  if (status === 'To do' || !status) {\n    const proposedAge = ageDays(proposed_on);\n    if (proposedAge !== null && proposedAge > 7) staleOpenTasks.push({ ...task, age_days: proposedAge });\n    if (!proposed_on) openTasksWithoutProposedOn.push(task);\n  }\n}\n\nconst dailyBriefBlocks = nodeItems('Daily Briefs');\nconst daily_briefs = [];\nconst allDailyBriefDates = [];\nconst oldDailyBriefDates = [];\nlet current = null;\nfor (const block of dailyBriefBlocks) {\n  const text = getText(block).trim();\n  if (block.type === 'heading_2') {\n    const match = text.match(/Daily Brief[^0-9]*(\\d{2})\\/(\\d{2})\\/(\\d{4})/i);\n    const isoDate = match ? `${match[3]}-${match[2]}-${match[1]}` : '';\n    if (isoDate) {\n      allDailyBriefDates.push(isoDate);\n      const briefAge = ageDays(isoDate);\n      if (briefAge !== null && briefAge > 30) oldDailyBriefDates.push({ date: isoDate, age_days: briefAge });\n    }\n    current = inPeriod(isoDate) ? { date: isoDate, content: [] } : null;\n    if (current) daily_briefs.push(current);\n    continue;\n  }\n  if (current && text) current.content.push(text);\n}\n\nconst inbox = [];\nconst staleInboxItems = [];\nconst briefedUnarchivedItems = [];\nfor (const row of nodeItems('AI Inbox')) {\n  const p = mapped(row);\n  const title = field(p, ['name', 'title']) || '(untitled)';\n  const status = field(p, ['status']);\n  const captured_at = field(p, ['capturedat', 'createdtime']);\n  const briefed_at = field(p, ['briefedat']);\n  const item = {\n    title,\n    status,\n    source: field(p, ['source']),\n    area: field(p, ['area']),\n    captured_at,\n    briefed_at,\n  };\n  inbox.push(item);\n  if (status === 'Inbox') {\n    const captureAge = ageDays(captured_at);\n    if (captureAge !== null && captureAge > 7) staleInboxItems.push({ ...item, age_days: captureAge });\n  }\n  if (status === 'Briefed') {\n    const briefedAge = ageDays(briefed_at || captured_at);\n    if (briefedAge !== null && briefedAge > 14) briefedUnarchivedItems.push({ ...item, age_days: briefedAge });\n  }\n}\n\nconst library = [];\nconst libraryRows = $env.NOTION_LIBRARY_DATABASE_ID ? nodeItems('Library') : [];\nfor (const row of libraryRows) {\n  const p = mapped(row);\n  const title = field(p, ['name', 'title']);\n  const date = field(p, ['publishedat', 'capturedat', 'createdtime', 'lasteditedtime']);\n  if (title && (!date || inPeriod(date))) library.push({ title, date, author: field(p, ['author']), category: field(p, ['category', 'type']), summary: field(p, ['summary', 'highlights']) });\n}\n\nconst repeatedNoteCandidates = repeatedEntries([\n  ...journal.map(entry => ({ text: entry.text, source: `Journal: ${entry.date}` })),\n  ...todos.map(entry => ({ text: entry.text, source: entry.checked ? 'Todo: checked' : 'Todo: open' })),\n]);\nconst memory_lint = {\n  thresholds: {\n    system_context_chars_warning: 12000,\n    stale_open_task_days: 7,\n    stale_inbox_days: 7,\n    briefed_archive_days: 14,\n    old_daily_brief_days: 30,\n    repeated_note_count: 3,\n  },\n  page_sizes: {\n    system_context_chars: systemContextFull.length,\n    system_context_lines: contextLines.length,\n    notes_blocks_read: noteBlocks.length,\n    weekly_journal_entries: journal.length,\n    todo_count: todos.length,\n    open_todo_count: todos.filter(todo => !todo.checked).length,\n    daily_brief_blocks_read: dailyBriefBlocks.length,\n    daily_brief_heading_count: allDailyBriefDates.length,\n    inbox_rows_read: inbox.length,\n  },\n  flags: {\n    system_context_long: systemContextFull.length > 12000,\n    system_context_truncated: systemContextFull.length > system_context.length,\n  },\n  stale_open_tasks: staleOpenTasks.slice(0, 25),\n  open_tasks_without_proposed_on: openTasksWithoutProposedOn.slice(0, 25),\n  active_objectives_without_next_step: activeObjectivesWithoutNextStep.slice(0, 25),\n  stale_inbox_items: staleInboxItems.slice(0, 25),\n  briefed_unarchived_items: briefedUnarchivedItems.slice(0, 25),\n  old_daily_brief_dates: oldDailyBriefDates.slice(0, 25),\n  repeated_note_candidates: repeatedNoteCandidates,\n};\n\nreturn [{ json: { ...period, language: $env.WEEKLY_LANGUAGE || 'French', system_context, journal: journal.slice(0, 100), todos: todos.slice(0, 100), objectives: objectives.slice(0, 50), tasks: tasks.slice(0, 150), inbox: inbox.slice(0, 50), daily_briefs: daily_briefs.slice(0, 7), library: library.slice(0, 50), memory_lint } }];\n"
         }
       },
       {
@@ -307,7 +336,7 @@
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [
-          2420,
+          2640,
           240
         ],
         "parameters": {
@@ -336,7 +365,7 @@
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
-          2640,
+          2860,
           240
         ],
         "parameters": {
@@ -350,7 +379,7 @@
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [
-          2860,
+          3080,
           240
         ],
         "parameters": {
@@ -387,7 +416,7 @@
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
-          2640,
+          2860,
           400
         ],
         "parameters": {
@@ -400,7 +429,7 @@
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
         "position": [
-          2860,
+          3080,
           400
         ],
         "parameters": {
@@ -508,7 +537,7 @@
         "main": [
           [
             {
-              "node": "Library configured?",
+              "node": "AI Inbox",
               "type": "main",
               "index": 0
             }
@@ -587,6 +616,17 @@
           [
             {
               "node": "Telegram alert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Inbox": {
+        "main": [
+          [
+            {
+              "node": "Library configured?",
               "type": "main",
               "index": 0
             }

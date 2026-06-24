@@ -29,6 +29,19 @@ nano .env            # fill secrets, Notion IDs, Telegram, RSS feeds
 
 That's it — `install.sh` is idempotent, re-run it any time.
 
+### Build your System Context
+
+After creating the Notion `System Context` page, run the onboarding interview:
+
+```bash
+python3 scripts/system-context-onboarding.py --stdout
+```
+
+It asks 18 questions, saves reusable answers in `runtime/system-context.answers.json`, and writes
+`runtime/system-context.md`. Paste the generated Markdown into the Notion page configured as
+`NOTION_CONTEXT_PAGE_ID`. Re-run it later to rebuild the page from the saved answers instead of
+letting the context grow by accident.
+
 ### How will you reach n8n? (the only real choice)
 
 The first run asks **one question** and wires everything for you. **No public exposure is
@@ -70,6 +83,8 @@ tunnel token. Secrets live only in `.env` (never committed); `.env.example` is t
   (Sonnet → Codex) for n8n.
 - `bridge/memo-summarize` is the Claude CLI wrapper used by `/summarize`.
 - `bridge/memo.sh` sends quick captures to the public n8n webhook.
+- `scripts/system-context-onboarding.py` interviews you once and generates the Markdown for the
+  Notion `System Context` page.
 
 ## Workflows
 
@@ -79,7 +94,7 @@ tunnel token. Secrets live only in `.env` (never committed); `.env.example` is t
 | Daily Brief | Objective-driven daily synthesis |
 | Automatic Watch - AI Inbox | Configurable RSS watch |
 | Task Lifecycle (Done on) | Keeps task completion dates consistent |
-| Weekly Review | Evidence-based Sunday review and next-week focus |
+| Weekly Review | Evidence-based Sunday review, memory maintenance, and next-week focus |
 | Global Error Monitor | Failure alerts for every critical workflow |
 
 Daily Brief is an **objective-driven copilot**: it reads the Objectives database (the compass) plus
@@ -94,10 +109,12 @@ contains no personal fallback and refuses contextual generation when that page i
 Weekly Review runs on Sunday at 19:00 and writes at the top of `Daily Brief`, just after its
 permanent header. It treats `Done on` and
 dated Journal entries as execution evidence, treats Daily Briefs only as intentions, avoids counting
-the same signal twice, and proposes exact objective updates without applying them. Its public prompt
-is versioned in `prompts/weekly-review.md`; identity and priorities still come only from
-`System Context`. A Readwise or other Library database can be included through the optional
-`NOTION_LIBRARY_DATABASE_ID` variable.
+the same signal twice, and proposes exact objective or `System Context` updates without applying
+them. It also runs a memory lint over stale open tasks, old AI Inbox captures, Briefed captures
+ready to archive, repeated notes, old Daily Briefs, objectives without next steps, and oversized
+context. Its public prompt is versioned in `prompts/weekly-review.md`; identity and priorities
+still come only from `System Context`. A Readwise or other Library database can be included through
+the optional `NOTION_LIBRARY_DATABASE_ID` variable.
 
 Automatic Watch runs before the Daily Brief. Feeds, keywords, age and volume limits are configured
 through `WATCH_*` variables in `.env`; no personal source or topic is embedded in the workflow.

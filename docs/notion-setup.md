@@ -75,6 +75,17 @@ The brief proposes 1–3 tasks/day here; still-open and recently-completed tasks
 | Notes            | `NOTION_NOTES_PAGE_ID`      | Journal. Recognized `heading_2`/`heading_1` sections: `Today`, `Journal`, and `Todo`/`✅`. The Daily Brief moves `Today` under yesterday's Journal date, then clears it. An `Archive`/`🗄` heading ends parsing. |
 | System Context   | `NOTION_CONTEXT_PAGE_ID`    | Free text read each morning as the brief's system context (who you are, projects, priorities, copilot rules). No personal data lives in the code. |
 
+Seed `System Context` with the onboarding interview instead of writing it from scratch:
+
+```bash
+python3 scripts/system-context-onboarding.py --stdout
+```
+
+The script asks 18 questions, saves answers under `runtime/`, and writes
+`runtime/system-context.md`. Paste that Markdown into the Notion `System Context` page. The script
+does not call the Notion API directly, so the n8n Notion credential remains the only automation
+credential with page write access.
+
 The `Task Lifecycle (Done on)` workflow sets `Done on` when a task reaches `Done`, clears it when
 the task is reopened or abandoned, and sets a fresh completion date if it is completed again.
 
@@ -85,7 +96,9 @@ archived notes.
 Weekly Review runs every Sunday at 19:00 using the instance timezone. It shares the Daily Brief
 page and inserts after the same permanent header, so no additional Notion page is required. The optional
 `NOTION_LIBRARY_DATABASE_ID` may point to a shared Readwise or other Library database; leave it
-empty to omit that source.
+empty to omit that source. The review also reads the AI Inbox and emits memory-maintenance
+proposals for stale captures, repeated notes, old briefs, stale tasks, and context/objective
+patches. It proposes changes only; it does not archive or edit those resources automatically.
 
 ## Sharing
 

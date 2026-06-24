@@ -308,6 +308,101 @@ class WeeklyReviewCodeTests(unittest.TestCase):
         self.assertEqual(result["objectives"][0]["name"], "Ship a reliable system")
         self.assertIn("Prioritize evidence.", result["system_context"])
 
+    def test_assemble_evidence_builds_memory_lint(self):
+        today = datetime.datetime(2026, 6, 24)
+        monday = today - datetime.timedelta(days=today.weekday())
+        old_date = (today - datetime.timedelta(days=45)).strftime("%d/%m/%Y")
+        repeated_note = "Same idea keeps coming back"
+        period = {
+            "week_start": monday.strftime("%d/%m/%Y"),
+            "week_end": today.strftime("%d/%m/%Y"),
+            "start_iso": monday.strftime("%Y-%m-%d"),
+            "end_iso": today.strftime("%Y-%m-%d"),
+        }
+        nodes = {
+            "Prepare review period": [period],
+            "System context": [{
+                "type": "paragraph",
+                "paragraph": {"rich_text": [{"plain_text": "Keep memory compact."}]},
+            }],
+            "Notes": [
+                {
+                    "type": "heading_2",
+                    "heading_2": {"rich_text": [{"plain_text": "Journal"}]},
+                },
+                {
+                    "type": "heading_3",
+                    "heading_3": {"rich_text": [{"plain_text": today.strftime("%d/%m/%Y")}]},
+                },
+                *[
+                    {
+                        "type": "paragraph",
+                        "paragraph": {"rich_text": [{"plain_text": repeated_note}]},
+                    }
+                    for _ in range(3)
+                ],
+                {
+                    "type": "heading_2",
+                    "heading_2": {"rich_text": [{"plain_text": "Todo"}]},
+                },
+                {
+                    "type": "to_do",
+                    "to_do": {"rich_text": [{"plain_text": "Open loose end"}], "checked": False},
+                },
+            ],
+            "Objectives": [{
+                "property_name": "Simplify memory",
+                "property_status": "Active",
+                "property_priority": "High",
+                "property_current_state": "Too much raw material",
+            }],
+            "Tasks": [{
+                "property_task": "Old open task",
+                "property_status": "To do",
+                "property_area": "Projects",
+                "property_proposed_on": {
+                    "start": (today - datetime.timedelta(days=10)).strftime("%Y-%m-%d")
+                },
+            }],
+            "Daily Briefs": [{
+                "type": "heading_2",
+                "heading_2": {"rich_text": [{"plain_text": f"Daily Brief - {old_date}"}]},
+            }],
+            "AI Inbox": [
+                {
+                    "property_name": "Old raw capture",
+                    "property_status": "Inbox",
+                    "property_captured_at": {
+                        "start": (today - datetime.timedelta(days=9)).strftime("%Y-%m-%d")
+                    },
+                },
+                {
+                    "property_name": "Already briefed capture",
+                    "property_status": "Briefed",
+                    "property_captured_at": {
+                        "start": (today - datetime.timedelta(days=20)).strftime("%Y-%m-%d")
+                    },
+                },
+            ],
+        }
+
+        result = run_code(
+            "weekly-review.workflow.json",
+            "Assemble evidence",
+            nodes=nodes,
+            env={"WEEKLY_LANGUAGE": "French", "NOTION_LIBRARY_DATABASE_ID": ""},
+        )[0]["json"]
+        lint = result["memory_lint"]
+
+        self.assertEqual(lint["stale_open_tasks"][0]["title"], "Old open task")
+        self.assertEqual(lint["active_objectives_without_next_step"][0]["name"], "Simplify memory")
+        self.assertEqual(lint["stale_inbox_items"][0]["title"], "Old raw capture")
+        self.assertEqual(lint["briefed_unarchived_items"][0]["title"], "Already briefed capture")
+        self.assertEqual(lint["old_daily_brief_dates"][0]["age_days"], 45)
+        self.assertEqual(lint["repeated_note_candidates"][0]["count"], 3)
+        self.assertEqual(lint["page_sizes"]["open_todo_count"], 1)
+        self.assertEqual(result["inbox"][0]["title"], "Old raw capture")
+
 
 if __name__ == "__main__":
     unittest.main()

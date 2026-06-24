@@ -107,6 +107,8 @@ window before the lifecycle workflow runs.
 - `prompts/weekly-review.md`: generic, versioned Weekly Review instructions.
 - `bridge/memo-summarize`: Claude CLI wrapper for `/summarize`.
 - `bridge/memo.sh`: command-line capture helper.
+- `scripts/system-context-onboarding.py`: guided interview that generates the Notion
+  `System Context` Markdown.
 - `systemd/*.service.in`: service templates rendered by `install.sh`.
 - `scripts/monitor-system.py`: service, public canary, and heartbeat watchdog.
 - `scripts/{import,export}-workflows.sh`: validated workflow synchronization.
@@ -291,15 +293,22 @@ private host.
 
 ## Weekly Review contract
 
-Every Sunday at 19:00, `Weekly Review` reads System Context, the week's Daily Briefs, dated Journal
-entries and todos, Objectives, Tasks, and the optional Library database. It calls `/weekly`, then
-inserts the result after the permanent first block of the Daily Brief page. A matching
-week heading stops a retry before any additional generation.
+Every Sunday at 19:00, `Weekly Review` reads System Context, the AI Inbox, the week's Daily Briefs,
+dated Journal entries and todos, Objectives, Tasks, and the optional Library database. It calls
+`/weekly`, then inserts the result after the permanent first block of the Daily Brief page. A
+matching week heading stops a retry before any additional generation.
 
 The evidence contract is deliberately stricter than the Daily Brief: a task counts as execution
 only when `Status=Done` and `Done on` falls within the review period; Journal entries are evidence;
 Daily Briefs remain intentions. The model proposes exact objective edits but the workflow never
-changes Objectives, Notes, Tasks, or System Context. `WEEKLY_LANGUAGE` controls the output language.
+changes Objectives, Notes, Tasks, AI Inbox, or System Context. `WEEKLY_LANGUAGE` controls the
+output language.
+
+The same workflow also builds a `memory_lint` payload. It flags stale open tasks, open tasks
+without `Proposed on`, active objectives without `Next step`, stale `Inbox` captures, old `Briefed`
+captures that can be archived, Daily Briefs older than 30 days, repeated notes, and long or
+truncated System Context. The prompt turns those diagnostics into proposals; nothing is cleaned up
+automatically in this version.
 
 ## Daily Brief contract
 

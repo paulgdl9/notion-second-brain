@@ -681,10 +681,14 @@ class H(BaseHTTPRequestHandler):
             if v:
                 text = str(v)
                 break
-        if not text.strip():
-            return self._send(400, {"ok": False, "error": "no text provided"})
 
         url = (data.get("url") or "").strip() or first_url(text)
+
+        # Accept URL-only payloads (e.g. iOS Shortcut sharing a tweet URL with no text body)
+        if not text.strip() and url:
+            text = url
+        if not text.strip():
+            return self._send(400, {"ok": False, "error": "no text provided"})
 
         # 1) Fetch URL content when needed.
         inferred = ""
