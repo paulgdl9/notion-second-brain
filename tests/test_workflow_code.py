@@ -185,6 +185,26 @@ class DailyBriefCodeTests(unittest.TestCase):
         self.assertEqual(result["body"]["children"][0]["paragraph"]["rich_text"][0]["text"]["content"], "Daily notes")
         self.assertEqual(result["body"]["children"][1]["paragraph"]["rich_text"][0]["text"]["content"], "A useful observation")
 
+    def test_notes_rollover_copies_flat_notion_content(self):
+        result = run_code(
+            "daily-brief.workflow.json",
+            "Prepare Notes rollover",
+            inputs=self._notes_blocks({
+                "id": "today-note",
+                "type": "paragraph",
+                "has_children": False,
+                "content": "A flat Notion node output",
+            }),
+        )[0]["json"]
+
+        self.assertTrue(result["needs_write"])
+        self.assertEqual(result["body"]["after"], "date-heading")
+        self.assertEqual(result["body"]["children"][0]["paragraph"]["rich_text"][0]["text"]["content"], "Daily notes")
+        self.assertEqual(
+            result["body"]["children"][1]["paragraph"]["rich_text"][0]["text"]["content"],
+            "A flat Notion node output",
+        )
+
     def test_notes_rollover_retries_only_the_clear_after_partial_success(self):
         today_note = {
             "id": "today-note",
