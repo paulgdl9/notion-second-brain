@@ -89,9 +89,9 @@ credential with page write access.
 The `Task Lifecycle (Done on)` workflow sets `Done on` when a task reaches `Done`, clears it when
 the task is reopened or abandoned, and sets a fresh completion date if it is completed again.
 
-The Notes rollover runs only when a new Daily Brief is due. It writes a `Daily notes` marker under
-yesterday's Journal date before clearing `Today`; retries detect that marker and never duplicate the
-archived notes.
+The Notes rollover runs only when a new Daily Brief is due. It writes the non-empty `Today` blocks
+under yesterday's Journal date before clearing `Today`; retries compare the text already present
+under that date and avoid duplicating archived notes.
 
 Weekly Review runs every Sunday at 19:00 using the instance timezone. It shares the Daily Brief
 page and inserts after the same permanent header, so no additional Notion page is required. The optional

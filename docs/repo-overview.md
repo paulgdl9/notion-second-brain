@@ -79,9 +79,9 @@ the top. If the first block is deleted, the workflow falls back to appending at 
 reading context or calling an LLM, the workflow scans the page headings for the current date and
 stops when that day's brief already exists.
 
-The Notes rollover copies non-empty blocks from `Today` under yesterday's Journal heading, writes a
-`Daily notes` marker, and only then archives the original blocks. Empty spacer blocks are cleared but
-not copied. If clearing fails after the write, the next run sees the marker and resumes cleanup
+The Notes rollover copies non-empty blocks from `Today` under yesterday's Journal heading, and only
+then archives the original blocks. Empty spacer blocks are cleared but not copied. If clearing fails
+after the write, the next run compares the text already present under that date and resumes cleanup
 without duplicating content. Unsupported or nested blocks stop the workflow instead of being lost.
 
 ### Task lifecycle flow

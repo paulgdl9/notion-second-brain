@@ -29,7 +29,7 @@ def run_code(workflow, node, *, inputs=None, nodes=None, env=None):
 
 class DailyBriefCodeTests(unittest.TestCase):
     @staticmethod
-    def _notes_blocks(*today_content, include_marker=False):
+    def _notes_blocks(*today_content, archived_texts=()):
         yesterday = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%d/%m/%Y")
         blocks = [
             {
@@ -49,11 +49,11 @@ class DailyBriefCodeTests(unittest.TestCase):
                 "heading_3": {"rich_text": [{"plain_text": f"📅 {yesterday}"}]},
             },
         ]
-        if include_marker:
+        for index, text in enumerate(archived_texts):
             blocks.append({
-                "id": "marker",
+                "id": f"archived-{index}",
                 "type": "paragraph",
-                "paragraph": {"rich_text": [{"plain_text": "Daily notes"}]},
+                "paragraph": {"rich_text": [{"plain_text": text}]},
             })
         blocks.append({
             "id": "todos-heading",
@@ -182,8 +182,8 @@ class DailyBriefCodeTests(unittest.TestCase):
         self.assertTrue(result["needs_clear"])
         self.assertEqual(result["original_ids"], ["today-note", "empty-paragraph"])
         self.assertEqual(result["body"]["after"], "date-heading")
-        self.assertEqual(result["body"]["children"][0]["paragraph"]["rich_text"][0]["text"]["content"], "Daily notes")
-        self.assertEqual(result["body"]["children"][1]["paragraph"]["rich_text"][0]["text"]["content"], "A useful observation")
+        self.assertEqual(len(result["body"]["children"]), 1)
+        self.assertEqual(result["body"]["children"][0]["paragraph"]["rich_text"][0]["text"]["content"], "A useful observation")
 
     def test_notes_rollover_copies_flat_notion_content(self):
         result = run_code(
@@ -199,9 +199,8 @@ class DailyBriefCodeTests(unittest.TestCase):
 
         self.assertTrue(result["needs_write"])
         self.assertEqual(result["body"]["after"], "date-heading")
-        self.assertEqual(result["body"]["children"][0]["paragraph"]["rich_text"][0]["text"]["content"], "Daily notes")
         self.assertEqual(
-            result["body"]["children"][1]["paragraph"]["rich_text"][0]["text"]["content"],
+            result["body"]["children"][0]["paragraph"]["rich_text"][0]["text"]["content"],
             "A flat Notion node output",
         )
 
@@ -215,7 +214,7 @@ class DailyBriefCodeTests(unittest.TestCase):
         result = run_code(
             "daily-brief.workflow.json",
             "Prepare Notes rollover",
-            inputs=self._notes_blocks(today_note, include_marker=True),
+            inputs=self._notes_blocks(today_note, archived_texts=("Keep me",)),
         )[0]["json"]
 
         self.assertFalse(result["needs_write"])
